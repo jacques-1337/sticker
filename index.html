@@ -1084,6 +1084,51 @@
         </ul>
       </div>
 
+      <!-- Punkte-System Erklärung -->
+      <div class="info-section">
+        <h3>📊 Punkte-System</h3>
+
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
+          Jeder Sticker bringt Punkte – je weiter weg, desto mehr. Boni gibt's für Hauptstädte, neue Länder und Fotos.
+        </p>
+
+        <!-- Distanz-Tabelle -->
+        <div style="background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:10px">
+          <div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border)">
+            📏 Distanz von Stahnsdorf
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto">
+            <div style="padding:9px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)">Bis 2.000 km</div>
+            <div style="padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);text-align:right">+1 Pkt</div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)">2.000 – 5.000 km</div>
+            <div style="padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);text-align:right">+5 Pkt</div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)">5.000 – 10.000 km</div>
+            <div style="padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);border-bottom:1px solid var(--border);text-align:right">+10 Pkt</div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--accent);font-weight:600">Über 10.000 km 🌏</div>
+            <div style="padding:9px 12px;font-size:14px;font-weight:800;color:var(--accent);text-align:right">+25 Pkt</div>
+          </div>
+        </div>
+
+        <!-- Boni -->
+        <div style="background:var(--surface2);border-radius:10px;overflow:hidden">
+          <div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border)">
+            ✨ Boni (kumulativ)
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto">
+            <div style="padding:9px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)">🌍 Erstes Mal in neuem Land</div>
+            <div style="padding:9px 12px;font-size:13px;font-weight:700;color:var(--green);border-bottom:1px solid var(--border);text-align:right">+10 Pkt</div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)">🏛 Sticker in Hauptstadt</div>
+            <div style="padding:9px 12px;font-size:13px;font-weight:700;color:var(--accent2);border-bottom:1px solid var(--border);text-align:right">+3 Pkt</div>
+            <div style="padding:9px 12px;font-size:13px;color:var(--text2)">📷 Foto beigefügt</div>
+            <div style="padding:9px 12px;font-size:13px;font-weight:700;color:var(--accent2);text-align:right">+5 Pkt</div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;padding:10px 12px;background:rgba(232,200,74,0.08);border:1px solid rgba(232,200,74,0.2);border-radius:10px;font-size:13px;color:var(--text2)">
+          🏆 <strong style="color:var(--accent)">Max. 43 Punkte</strong> pro Sticker – Hauptstadt + neues Land + Foto + über 10.000 km
+        </div>
+      </div>
+
       <div class="info-section">
         <h3>🔒 Datenschutz</h3>
         <ul>
@@ -1473,7 +1518,8 @@ async function saveSticker(sticker) {
         photo_url: photoUrl,
         pts_breakdown: sticker.breakdown,
         username: sticker.username || null,
-        session_id: sticker.session_id || null
+        session_id: sticker.session_id || null,
+        user_id: sticker.user_id || null
       };
       const { data, error } = await db.from('stickers').insert([row]).select().single();
       if (error) throw error;
@@ -1831,7 +1877,8 @@ async function submitSticker() {
     photoData: photoData,
     breakdown: ptsData,
     username: myUsername || null,
-    session_id: mySessionId
+    session_id: mySessionId,
+    user_id: myUserId || null
   };
 
   try {
@@ -1967,10 +2014,17 @@ function saveUsername() {
   localStorage.setItem('32er_username', myUsername);
   document.getElementById('name-setup').classList.remove('show');
 
-  // Existierende Sticker dieser Session mit neuem Namen verknüpfen
-  if (useSupabase && mySessionId) {
-    db.from('stickers').update({ username: myUsername }).eq('session_id', mySessionId)
-      .then(({ error }) => { if (error) console.warn('Username-Sync:', error); });
+  // Alle Sticker dieser Session + user_id mit dem Namen verknüpfen
+  if (useSupabase) {
+    const updates = { username: myUsername };
+    if (mySessionId) {
+      db.from('stickers').update(updates).eq('session_id', mySessionId)
+        .then(({ error }) => { if (error) console.warn('Username-Sync (session):', error); });
+    }
+    if (myUserId) {
+      db.from('stickers').update(updates).eq('user_id', myUserId)
+        .then(({ error }) => { if (error) console.warn('Username-Sync (user_id):', error); });
+    }
   }
 
   updateScore();
@@ -2040,79 +2094,85 @@ async function loadLeaderboard() {
   list.innerHTML = '<div class="lb-loading">Lade Rangliste…</div>';
 
   if (!useSupabase) {
-    list.innerHTML = '<div class="lb-loading">⚠️ Keine Supabase-Verbindung</div>';
+    list.innerHTML = '<div class="lb-loading">⚠️ Keine Datenbankverbindung</div>';
     return;
   }
 
   try {
-    // Alle Sticker mit username laden
-    const { data, error } = await db
-      .from('stickers')
-      .select('username, session_id, points, pts, country_code, continent, photo_url')
-      .order('created_at', { ascending: false });
-
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000));
+    const fetchLb = db.from('stickers')
+      .select('user_id, session_id, username, points, country_code, continent, photo_url');
+    const { data, error } = await Promise.race([fetchLb, timeout]);
     if (error) throw error;
 
-    // Gruppieren nach username (nur mit username)
+    // Gruppieren nach user_id (primär) oder session_id (Fallback)
     const playerMap = {};
     (data || []).forEach(s => {
-      const name = s.username || null;
-      const sid = s.session_id || null;
-      const key = name || sid;
+      const key = s.user_id || s.session_id;
       if (!key) return;
-
       if (!playerMap[key]) {
-        playerMap[key] = { name: name || '–', sid, pts: 0, stickers: 0, countries: new Set(), continents: new Set(), photos: 0 };
+        playerMap[key] = {
+          name: s.username || null,
+          userId: s.user_id,
+          sid: s.session_id,
+          pts: 0, stickers: 0,
+          countries: new Set(), continents: new Set(), photos: 0
+        };
       }
-      playerMap[key].pts += s.points || s.pts || 0;
+      if (s.username) playerMap[key].name = s.username; // neuesten Namen nehmen
+      playerMap[key].pts += s.points || 0;
       playerMap[key].stickers++;
       if (s.country_code) playerMap[key].countries.add(s.country_code);
-      if (s.continent) playerMap[key].continents.add(s.continent);
-      if (s.photo_url) playerMap[key].photos++;
+      if (s.continent)    playerMap[key].continents.add(s.continent);
+      if (s.photo_url)    playerMap[key].photos++;
     });
 
-    // Sortieren
-    const players = Object.values(playerMap)
+    // Nur Spieler mit Namen im öffentlichen Leaderboard
+    const allPlayers = Object.values(playerMap)
       .map(p => ({ ...p, countries: p.countries.size, continents: p.continents.size }))
-      .filter(p => p.name !== '–' || p.sid === mySessionId)
       .sort((a, b) => b.pts - a.pts);
 
-    // Eigene Position finden
-    const myKey = myUsername || mySessionId;
-    const myIdx = players.findIndex(p => p.name === myUsername || p.sid === mySessionId);
-    const myRank = myIdx >= 0 ? myIdx + 1 : null;
+    const publicPlayers = allPlayers.filter(p => p.name);
 
-    // Eigene Karte updaten
-    updateMyScoreCard(players[myIdx] || null, myRank, players.length);
+    // Eigene Position: nach user_id oder session_id
+    const myIdx = allPlayers.findIndex(p =>
+      (myUserId && p.userId === myUserId) || p.sid === mySessionId
+    );
+    const myInPublic = publicPlayers.findIndex(p =>
+      (myUserId && p.userId === myUserId) || p.sid === mySessionId
+    );
+    const myRank = myInPublic >= 0 ? myInPublic + 1 : null;
 
-    if (!players.length) {
-      list.innerHTML = '<div class="lb-loading">Noch keine Einträge – sei der Erste!</div>';
+    updateMyScoreCard(myIdx >= 0 ? allPlayers[myIdx] : null, myRank, publicPlayers.length);
+
+    if (!publicPlayers.length) {
+      list.innerHTML = `<div class="lb-loading" style="padding:24px">
+        Noch keine Einträge mit Namen.<br>
+        <span style="font-size:12px;opacity:0.6;margin-top:6px;display:block">Namen im Score-Tab setzen um im Leaderboard zu erscheinen.</span>
+      </div>`;
       return;
     }
 
-    // Top 10 + eigene Position rendern
     const showTop = 10;
     let html = '';
-    const topPlayers = players.slice(0, showTop);
-
-    topPlayers.forEach((p, i) => {
+    publicPlayers.slice(0, showTop).forEach((p, i) => {
       const rank = i + 1;
-      const isMe = (p.name === myUsername && myUsername) || p.sid === mySessionId;
+      const isMe = (myUserId && p.userId === myUserId) || p.sid === mySessionId;
       const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
-      const rankClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+      const rankClass = rank <= 3 ? `top${rank}` : '';
       html += `<div class="lb-row${isMe ? ' is-me' : ''}">
         <div class="lb-rank ${rankClass}">${rankIcon}</div>
-        <div class="lb-name">${escHtml(p.name)}${isMe ? ' <span style="color:var(--accent);font-size:11px">(Du)</span>' : ''}
-          <small>${p.stickers} Sticker · ${p.countries} Länder</small>
+        <div class="lb-name">
+          ${escHtml(p.name)}${isMe ? ' <span style="color:var(--accent);font-size:11px">(Du)</span>' : ''}
+          <small>${p.stickers} Sticker · ${p.countries} Länder · ${p.continents} Kontinente</small>
         </div>
         <div class="lb-pts">${p.pts}<small>Pkt</small></div>
       </div>`;
     });
 
-    // Falls eigene Position außerhalb Top 10
-    if (myIdx >= showTop && myRank) {
+    if (myRank && myRank > showTop) {
       html += '<div class="lb-separator">· · ·</div>';
-      const me = players[myIdx];
+      const me = publicPlayers[myInPublic];
       html += `<div class="lb-row is-me">
         <div class="lb-rank">#${myRank}</div>
         <div class="lb-name">${escHtml(me.name)} <span style="color:var(--accent);font-size:11px">(Du)</span>
@@ -2126,10 +2186,11 @@ async function loadLeaderboard() {
 
   } catch(e) {
     console.error('Leaderboard error:', e);
-    const hint = e.message?.includes('column') || e.message?.includes('username')
-      ? '<br><small style="font-size:11px;opacity:0.6">SQL fehlt: ALTER TABLE stickers ADD COLUMN IF NOT EXISTS username text; ADD COLUMN IF NOT EXISTS session_id text;</small>'
-      : '';
-    list.innerHTML = `<div class="lb-loading">⚠️ Fehler beim Laden${hint}</div>`;
+    const isMissingCol = e.message?.includes('column') || e.message?.includes('does not exist');
+    list.innerHTML = `<div class="lb-loading">
+      ⚠️ ${isMissingCol ? 'Datenbank-Spalten fehlen' : 'Fehler beim Laden'}
+      ${isMissingCol ? '<br><small style="font-size:11px;opacity:0.6;display:block;margin-top:6px">SQL ausführen: ALTER TABLE stickers ADD COLUMN IF NOT EXISTS username text, ADD COLUMN IF NOT EXISTS session_id text, ADD COLUMN IF NOT EXISTS user_id uuid;</small>' : ''}
+    </div>`;
   }
 }
 
@@ -2263,7 +2324,26 @@ function toast(msg, type = '') {
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+//  AUTH – anonyme Supabase-Session (persistente user_id)
+// ═══════════════════════════════════════════════
+let myUserId = null;
+
+async function ensureAuth() {
+  if (!useSupabase) return;
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) { myUserId = session.user.id; return; }
+    const { data, error } = await db.auth.signInAnonymously();
+    if (error) throw error;
+    myUserId = data.user?.id || null;
+  } catch(e) {
+    console.warn('Anonymous auth nicht verfügbar (in Supabase aktivieren):', e.message);
+  }
+}
+
 async function init() {
+  await ensureAuth();
   initMap();
   stickers = await loadStickers();
   renderMarkers();
