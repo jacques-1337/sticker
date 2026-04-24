@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>32er Worldwide 🌍</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #e8c84a;
+    --accent2: #f0a030;
+    --text: #f0f0f8;
+    --text2: #8888aa;
+    --green: #4ae8a0;
+    --red: #e84a6a;
+    --nav-h: 64px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html {
+    width: 100%; height: 100%;
+    height: -webkit-fill-available;
+  }
+
+  body {
+    width: 100%;
+    height: 100%;
+    min-height: -webkit-fill-available;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  /* ── APP SHELL ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── BOTTOM NAV ── */
+  #nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: calc(var(--nav-h) + var(--safe-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 1000;
+    padding-bottom: var(--safe-bottom);
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 10px;
+    cursor: pointer;
+    transition: color 0.2s;
+    padding: 8px 4px;
+  }
+  .nav-btn .icon { font-size: 22px; line-height: 1; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn.add-btn { color: var(--accent); }
+  .nav-btn.add-btn .icon {
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 0 20px rgba(232,200,74,0.4);
+  }
+
+  /* ── SCREENS ── */
+  .screen {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    bottom: calc(var(--nav-h) + var(--safe-bottom));
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .screen.active { display: block; }
+
+  /* ── MAP SCREEN ── */
+  #screen-map { overflow: hidden; }
+  #map {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: #e8e0d8;
+  }
+
+  /* Map stats overlay */
+  #map-stats {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: rgba(10,10,15,0.85);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    z-index: 500;
+    backdrop-filter: blur(8px);
+    font-size: 12px;
+    color: var(--text2);
+    pointer-events: none;
+  }
+  #map-stats strong { color: var(--accent); font-size: 15px; }
+
+  /* ── SCREEN HEADER ── */
+  .screen-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 12px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .screen-header h2 {
+    font-size: 20px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .screen-header p { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  /* ── ADD SCREEN ── */
+  .form-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  .form-group label {
+    display: block;
+    font-size: 12px; font-weight: 600;
+    color: var(--text2); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+    -webkit-appearance: none;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: none; height: 80px; }
+
+  /* Search suggestions */
+  .suggestions {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-top: 4px;
+    overflow: hidden;
+    display: none;
+  }
+  .suggestions.open { display: block; }
+  .suggestion-item {
+    padding: 11px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:hover, .suggestion-item:active { background: var(--border); }
+  .suggestion-item .flag { font-size: 18px; }
+  .suggestion-item .pop { font-size: 11px; color: var(--text2); }
+
+  /* Location confirm */
+  #loc-confirm {
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #loc-confirm .loc-info { flex: 1; font-size: 13px; }
+  #loc-confirm .loc-info strong { color: var(--accent); font-size: 15px; display: block; }
+  #loc-confirm .pts { font-weight: 700; color: var(--accent); font-size: 22px; }
+
+  /* Punkte-Aufschlüsselung */
+  #pts-breakdown {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: none;
+    gap: 6px;
+    flex-direction: column;
+  }
+  #pts-breakdown.show { display: flex; }
+  .pts-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--text2);
+  }
+  .pts-row .pts-val { font-weight: 700; color: var(--text); }
+  .pts-row.pts-total {
+    border-top: 1px solid var(--border);
+    margin-top: 4px; padding-top: 8px;
+    color: var(--text); font-weight: 700;
+  }
+  .pts-row.pts-total .pts-val { color: var(--accent); font-size: 16px; }
+
+  /* Photo upload */
+  .photo-upload-btn {
+    width: 100%;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    color: var(--text2); font-size: 14px;
+  }
+  .photo-upload-btn:hover { border-color: var(--accent); background: rgba(232,200,74,0.05); }
+  .photo-upload-btn .upload-icon { font-size: 32px; margin-bottom: 6px; }
+  #photo-preview {
+    display: none;
+    width: 100%; max-height: 200px;
+    border-radius: 10px; object-fit: cover;
+  }
+
+  /* Submit button */
+  .btn-primary {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 16px; font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── STICKER LIST ── */
+  #sticker-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .sticker-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .sticker-card:active { border-color: var(--accent); }
+  .sticker-card-body { padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+  .sticker-flag { font-size: 32px; line-height: 1; }
+  .sticker-info { flex: 1; min-width: 0; }
+  .sticker-city { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sticker-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .sticker-pts {
+    font-weight: 800; font-size: 20px; color: var(--accent);
+    text-align: right; white-space: nowrap;
+  }
+  .sticker-pts small { display: block; font-size: 10px; font-weight: 400; color: var(--text2); }
+  .sticker-photo { width: 100%; max-height: 180px; object-fit: cover; display: block; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 7px; border-radius: 20px;
+    font-size: 10px; font-weight: 700;
+    margin-right: 4px;
+  }
+  .badge-capital { background: rgba(232,200,74,0.2); color: var(--accent); }
+  .badge-newcountry { background: rgba(74,232,160,0.2); color: var(--green); }
+  .badge-photo { background: rgba(240,160,48,0.2); color: var(--accent2); }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 30px;
+    color: var(--text2);
+  }
+  .empty-state .es-icon { font-size: 56px; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 6px; }
+  .empty-state p { font-size: 14px; line-height: 1.5; }
+
+  /* ── SCORE / LEADERBOARD SCREEN ── */
+  #score-content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* Eigene Score-Karte */
+  .my-score-card {
+    background: linear-gradient(135deg, #1c1c28, #13131a);
+    border: 1.5px solid var(--accent);
+    border-radius: 20px;
+    padding: 20px;
+    position: relative; overflow: hidden;
+  }
+  .my-score-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top left, rgba(232,200,74,0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .my-score-top {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .my-rank-badge {
+    min-width: 48px; height: 48px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 900;
+    flex-shrink: 0;
+  }
+  .my-name-wrap { flex: 1; min-width: 0; }
+  .my-name {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 17px; font-weight: 800;
+  }
+  .edit-name-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; padding: 2px; opacity: 0.7;
+  }
+  .my-name-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .my-pts-big {
+    font-size: 28px; font-weight: 900; color: var(--accent);
+    text-align: right; white-space: nowrap; flex-shrink: 0;
+  }
+  .my-pts-big small { display: block; font-size: 11px; font-weight: 400; color: var(--text2); text-align: center; }
+  .my-stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px; padding: 12px 8px;
+  }
+  .my-stat { text-align: center; }
+  .my-stat span { display: block; font-size: 20px; font-weight: 800; color: var(--text); }
+  .my-stat small { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Name-Setup Card */
+  .name-setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    display: none;
+  }
+  .name-setup-card.show { display: block; }
+
+  /* Leaderboard */
+  .leaderboard-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .leaderboard-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px;
+    font-size: 14px; font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .refresh-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 16px; cursor: pointer; color: var(--text2);
+  }
+  .lb-loading { padding: 30px; text-align: center; color: var(--text2); font-size: 14px; }
+  .lb-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-row.is-me {
+    background: rgba(232,200,74,0.07);
+    border-left: 3px solid var(--accent);
+  }
+  .lb-rank {
+    font-size: 15px; font-weight: 800;
+    min-width: 32px; text-align: center;
+    color: var(--text2);
+  }
+  .lb-rank.top1 { color: #ffd700; font-size: 20px; }
+  .lb-rank.top2 { color: #c0c0c0; font-size: 18px; }
+  .lb-rank.top3 { color: #cd7f32; font-size: 18px; }
+  .lb-name { flex: 1; font-size: 15px; font-weight: 600; }
+  .lb-name small { display: block; font-size: 11px; color: var(--text2); font-weight: 400; margin-top: 1px; }
+  .lb-pts { font-size: 18px; font-weight: 800; color: var(--accent); white-space: nowrap; }
+  .lb-pts small { font-size: 10px; font-weight: 400; color: var(--text2); }
+  .lb-separator {
+    padding: 8px 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 2px;
+  }
+
+  /* ── INFO SCREEN ── */
+  #info-content { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  .info-logo {
+    text-align: center;
+    padding: 30px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+  }
+  .info-logo .logo-big {
+    width: 80px; height: 80px;
+    border-radius: 20px;
+    margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 900;
+  }
+  .info-logo h1 { font-size: 22px; font-weight: 800; }
+  .info-logo p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .info-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .info-section h3 {
+    font-size: 15px; font-weight: 700;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .info-section p, .info-section li {
+    font-size: 13px; color: var(--text2);
+    line-height: 1.6;
+  }
+  .info-section ul { padding-left: 18px; }
+  .info-section li { margin-bottom: 4px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+    left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 12px 20px;
+    font-size: 14px; font-weight: 600;
+    opacity: 0; transition: all 0.3s;
+    z-index: 9999; white-space: nowrap;
+    pointer-events: none;
+    max-width: 90vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error { border-color: var(--red); color: var(--red); }
+
+  /* ── LOADING ── */
+  #loading-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; flex-direction: column; gap: 16px;
+    transition: opacity 0.4s;
+  }
+  #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loader-logo {
+    width: 70px; height: 70px;
+    background: var(--accent);
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; font-weight: 900; color: var(--bg);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .loader-text { font-size: 14px; color: var(--text2); }
+
+  /* ── MODAL ── */
+  #modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 2000; display: none;
+    align-items: flex-end;
+    backdrop-filter: blur(4px);
+  }
+  #modal-overlay.open { display: flex; }
+  .modal-sheet {
+    width: 100%;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+  .modal-close {
+    position: absolute; top: 16px; right: 20px;
+    background: none; border: none;
+    color: var(--text2); font-size: 24px; cursor: pointer;
+  }
+
+  /* Supabase config notice */
+  #config-notice {
+    background: rgba(232,200,74,0.1);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    margin: 16px;
+    display: none;
+  }
+  #config-notice.show { display: block; }
+  #config-notice strong { color: var(--accent); }
+  #config-notice code {
+    background: var(--surface2);
+    padding: 2px 6px; border-radius: 4px;
+    font-family: monospace; font-size: 12px;
+  }
+
+  /* ══════════════════════════════════════
+     STEP 1 – KARTE ZUM PINNEN (Vollbild)
+  ══════════════════════════════════════ */
+  #pin-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: none;
+    flex-direction: column;
+    background: #f0f0f0;
+  }
+  #pin-screen.open { display: flex; }
+
+  #pin-map {
+    flex: 1;
+    position: relative;
+    width: 100%;
+  }
+  #pin-map-leaflet {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Floating search bar */
+  #pin-search-bar {
+    position: absolute;
+    top: 12px; left: 12px; right: 12px;
+    z-index: 500;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  #pin-search-wrap {
+    flex: 1;
+    position: relative;
+  }
+  #pin-city-input {
+    width: 100%;
+    background: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 13px 16px;
+    color: #1a1a2e;
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    -webkit-appearance: none;
+  }
+  #pin-city-input:focus { box-shadow: 0 4px 20px rgba(232,200,74,0.35), 0 2px 8px rgba(0,0,0,0.12); }
+  #pin-city-input::placeholder { color: #aaa; }
+
+  #pin-suggestions {
+    background: #fff;
+    border-radius: 14px;
+    margin-top: 6px;
+    overflow: hidden;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  #pin-suggestions.open { display: block; }
+  #pin-suggestions .suggestion-item { color: #1a1a2e; border-bottom-color: #eee; }
+  #pin-suggestions .suggestion-item:hover { background: #f5f5f5; }
+  #pin-suggestions .suggestion-item .pop { color: #888; }
+
+  #pin-close-btn {
+    background: #fff;
+    border: none;
+    border-radius: 14px;
+    width: 48px; height: 48px;
+    font-size: 18px; cursor: pointer;
+    color: #555;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    flex-shrink: 0;
+  }
+
+  /* Zentriertes Fadenkreuz / Pin-Marker */
+  #pin-crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -100%);
+    z-index: 500;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+    transition: transform 0.15s ease;
+  }
+  #pin-crosshair.dragging { transform: translate(-50%, -110%) scale(1.15); }
+  #pin-crosshair .pin-head {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border: 3px solid var(--bg);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  #pin-crosshair .pin-head span { transform: rotate(45deg); }
+  #pin-crosshair .pin-shadow {
+    width: 12px; height: 6px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 50%;
+    margin-top: 2px;
+  }
+
+  /* Bottom panel – Orts-Info + Bestätigen */
+  #pin-bottom-panel {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-radius: 22px 22px 0 0;
+    padding: 16px 16px calc(16px + var(--safe-bottom));
+    z-index: 500;
+    box-shadow: 0 -6px 32px rgba(0,0,0,0.35);
+  }
+
+  #pin-location-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  #pin-loc-flag { font-size: 34px; line-height: 1; flex-shrink: 0; }
+  #pin-loc-info { flex: 1; min-width: 0; }
+  #pin-loc-city { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  #pin-loc-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  #pin-loc-pts { font-size: 26px; font-weight: 900; color: var(--accent); text-align: right; white-space: nowrap; flex-shrink: 0; line-height: 1; }
+  #pin-loc-pts small { display: block; font-size: 10px; font-weight: 400; color: var(--text2); text-align: center; }
+
+  #pin-confirm-btn {
+    display: block;
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 16px; font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  #pin-confirm-btn:active { transform: scale(0.98); opacity: 0.9; }
+  #pin-confirm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ══════════════════════════════════════
+     STEP 2 – DETAILS OVERLAY
+  ══════════════════════════════════════ */
+  #add-overlay {
+    position: fixed;
+    bottom: calc(var(--nav-h) + var(--safe-bottom));
+    left: 0; right: 0;
+    background: var(--surface);
+    border-top: 2px solid var(--accent);
+    border-radius: 20px 20px 0 0;
+    z-index: 900;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    max-height: 82vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #add-overlay.open { transform: translateY(0); }
+  #add-overlay-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px auto 0;
+  }
+  #add-overlay-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px 8px;
+  }
+  #add-overlay-header h3 { font-size: 17px; font-weight: 700; }
+  #close-overlay-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    font-size: 18px; cursor: pointer;
+    color: var(--text2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #add-overlay .form-body { padding: 0 20px 20px; }
+
+  /* Dimmer behind overlay */
+  #overlay-dimmer {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 850;
+    display: none;
+    backdrop-filter: blur(2px);
+  }
+  #overlay-dimmer.show { display: block; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Leaflet overrides */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    color: var(--text) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+  }
+  .leaflet-popup-tip { background: var(--surface2) !important; }
+  .leaflet-popup-content { margin: 12px 16px !important; }
+  .leaflet-control-attribution { display: none !important; }
+
+  /* Custom marker */
+  .map-marker {
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: var(--bg);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="loader-logo">32</div>
+  <div class="loader-text">Lade Sticker weltweit…</div>
+</div>
+
+<!-- Config Notice -->
+<div id="config-notice">
+  <strong>⚙️ Supabase nicht konfiguriert</strong><br>
+  Bearbeite die Datei und trage deine Keys ein:<br>
+  <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code><br>
+  Bis dahin werden Daten lokal gespeichert.
+</div>
+
+<!-- App -->
+<div id="app">
+
+  <!-- MAP SCREEN -->
+  <div id="screen-map" class="screen active">
+    <div id="map-stats">
+      📍 <strong id="stat-pins">0</strong> Sticker · 🌍 <strong id="stat-countries">0</strong> Länder
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- SCHRITT 1: Karte zum Pinnen -->
+  <div id="pin-screen">
+    <div id="pin-map">
+      <div id="pin-map-leaflet"></div>
+
+      <!-- Suchleiste oben -->
+      <div id="pin-search-bar">
+        <div id="pin-search-wrap">
+          <input type="text" id="pin-city-input" placeholder="🔍 Stadt suchen…" autocomplete="off" autocorrect="off" spellcheck="false">
+          <div id="pin-suggestions"></div>
+        </div>
+        <button id="pin-close-btn" onclick="closePinScreen()">✕</button>
+      </div>
+
+      <!-- Pin-Marker in der Mitte -->
+      <div id="pin-crosshair">
+        <div class="pin-head"><span>📍</span></div>
+        <div class="pin-shadow"></div>
+      </div>
+
+      <!-- Bottom Panel: Orts-Info + Bestätigen -->
+      <div id="pin-bottom-panel">
+        <div id="pin-location-bar">
+          <div id="pin-loc-flag">🌍</div>
+          <div id="pin-loc-info">
+            <div id="pin-loc-city">Karte verschieben oder Stadt suchen</div>
+            <div id="pin-loc-sub">Stadt antippen oder oben suchen</div>
+          </div>
+          <div id="pin-loc-pts" style="display:none">
+            <span id="pin-pts-val">0</span>
+            <small>Pkt</small>
+          </div>
+        </div>
+        <button id="pin-confirm-btn" disabled onclick="confirmPinLocation()">
+          Ort bestätigen → Details
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD OVERLAY (Schritt 2: Details) -->
+  <div id="overlay-dimmer" onclick="closeAddOverlay()"></div>
+  <div id="add-overlay">
+    <div id="add-overlay-handle"></div>
+    <div id="add-overlay-header">
+      <h3>✏️ Sticker-Details</h3>
+      <button id="close-overlay-btn" onclick="closeAddOverlay()">✕</button>
+    </div>
+    <div class="form-body">
+
+      <!-- Ort (aus Schritt 1, nicht editierbar hier) -->
+      <div id="loc-confirm" class="show">
+        <div style="font-size:36px" id="confirm-flag">🌍</div>
+        <div class="loc-info">
+          <strong id="confirm-city">–</strong>
+          <span id="confirm-country">–</span>
+          <div id="confirm-badges" style="margin-top:4px"></div>
+        </div>
+        <div class="pts">
+          <span id="confirm-pts">0</span>
+          <small>Pkt</small>
+        </div>
+      </div>
+
+      <!-- Punkte-Aufschlüsselung -->
+      <div id="pts-breakdown">
+        <div class="pts-row"><span>📏 Distanz</span><span class="pts-val" id="bd-dist">+0</span></div>
+        <div class="pts-row" id="bd-capital-row"><span>🏛 Hauptstadt</span><span class="pts-val">+3</span></div>
+        <div class="pts-row" id="bd-newcountry-row"><span>🌍 Neues Land</span><span class="pts-val">+10</span></div>
+        <div class="pts-row" id="bd-photo-row"><span>📷 Foto</span><span class="pts-val">+5</span></div>
+        <div class="pts-row pts-total"><span>Gesamt</span><span class="pts-val" id="bd-total">0 Pkt</span></div>
+      </div>
+
+      <!-- "Ort ändern" Link -->
+      <div style="text-align:center">
+        <button onclick="goBackToMap()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px">
+          ← Ort ändern
+        </button>
+      </div>
+
+      <!-- Photo -->
+      <div class="form-group">
+        <label>Foto (optional, +5 Punkte)</label>
+        <div class="photo-upload-btn" id="photo-upload-btn" onclick="document.getElementById('photo-input').click()">
+          <div class="upload-icon">📷</div>
+          <div>Foto hinzufügen</div>
+          <div style="font-size:11px;margin-top:4px;color:var(--text2)">JPEG / PNG, max 5 MB</div>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" style="display:none" capture="environment">
+        <img id="photo-preview" alt="Vorschau">
+      </div>
+
+      <!-- Note -->
+      <div class="form-group">
+        <label>Kommentar (optional)</label>
+        <textarea id="note-input" placeholder="Wo genau? Lustige Story?…"></textarea>
+      </div>
+
+      <!-- Privacy -->
+      <div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:10px;padding:12px;border:1px solid var(--border)">
+        🔒 <strong style="color:var(--text)">Datenschutz:</strong> GPS ~1 km verschleiert. EXIF entfernt. Kein Name gespeichert.
+      </div>
+
+      <button class="btn-primary" id="submit-btn" onclick="submitSticker()">
+        🎯 Sticker speichern
+      </button>
+    </div>
+  </div>
+
+  <!-- ADD SCREEN (versteckt, nicht mehr genutzt) -->
+  <div id="screen-add" class="screen" style="display:none!important"></div>
+
+  <!-- STICKER LIST -->
+  <div id="screen-stickers" class="screen">
+    <div class="screen-header">
+      <h2>📌 Alle Sticker</h2>
+      <p id="sticker-count-label">Lade…</p>
+    </div>
+    <div id="sticker-list"></div>
+  </div>
+
+  <!-- SCORE / LEADERBOARD -->
+  <div id="screen-score" class="screen">
+    <div class="screen-header">
+      <h2>🏆 Scoreboard</h2>
+      <p id="score-header-sub">Globale Rangliste</p>
+    </div>
+    <div id="score-content">
+
+      <!-- Eigene Karte oben -->
+      <div class="my-score-card" id="my-score-card">
+        <div class="my-score-top">
+          <div class="my-rank-badge" id="my-rank-badge">#–</div>
+          <div class="my-name-wrap">
+            <div class="my-name" id="my-display-name">
+              <span id="my-name-text">–</span>
+              <button class="edit-name-btn" onclick="showNameEdit()">✏️</button>
+            </div>
+            <div class="my-name-sub" id="my-name-sub">Dein Spielername</div>
+          </div>
+          <div class="my-pts-big" id="my-pts-big">0 <small>Pkt</small></div>
+        </div>
+        <div class="my-stats-row">
+          <div class="my-stat"><span id="my-sticker-count">0</span><small>Sticker</small></div>
+          <div class="my-stat"><span id="my-country-count">0</span><small>Länder</small></div>
+          <div class="my-stat"><span id="my-continent-count">0</span><small>Kontinente</small></div>
+          <div class="my-stat"><span id="my-photo-count">0</span><small>Fotos</small></div>
+        </div>
+      </div>
+
+      <!-- Name-Eingabe (initial oder edit) -->
+      <div id="name-setup" class="name-setup-card">
+        <div style="font-size:28px;margin-bottom:8px">👤</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">Dein Spielername</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:14px">Erscheint im globalen Leaderboard</div>
+        <input type="text" id="username-input" placeholder="z.B. Felix32, BerlinSticker…" maxlength="20"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:16px;outline:none;font-family:inherit;-webkit-appearance:none;margin-bottom:10px">
+        <button onclick="saveUsername()" class="btn-primary" style="padding:13px">
+          Speichern & ins Leaderboard
+        </button>
+      </div>
+
+      <!-- Globale Rangliste -->
+      <div class="leaderboard-section">
+        <div class="leaderboard-header">
+          <span>🌍 Globales Leaderboard</span>
+          <button class="refresh-btn" onclick="loadLeaderboard()">↻</button>
+        </div>
+        <div id="leaderboard-list">
+          <div class="lb-loading">Lade Rangliste…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- INFO -->
+  <div id="screen-info" class="screen">
+    <div id="info-content">
+      <div class="info-logo">
+        <div class="logo-big">32</div>
+        <h1>32er Worldwide 🌍</h1>
+        <p>Stahnsdorf 32er Sticker auf der ganzen Welt</p>
+      </div>
+
+      <div class="info-section">
+        <h3>🎯 Was ist das?</h3>
+        <p>Die 32er Community aus Stahnsdorf klebt ihre Sticker weltweit – und diese App macht alle Spots auf einer Karte sichtbar. Je weiter der Sticker von Stahnsdorf weg ist, desto mehr Punkte gibt's!</p>
+      </div>
+
+      <div class="info-section">
+        <h3>📍 So funktioniert's</h3>
+        <ul>
+          <li>Stadt suchen, wo du den Sticker gesetzt hast</li>
+          <li>Optional: Foto hinzufügen (+5 Punkte)</li>
+          <li>Auf der Karte erscheint dein Spot für alle sichtbar</li>
+          <li>Community-Score zeigt alle Punkte zusammen</li>
+        </ul>
+      </div>
+
+      <div class="info-section">
+        <h3>🔒 Datenschutz</h3>
+        <ul>
+          <li>Kein Account, kein Name erforderlich</li>
+          <li>GPS wird auf ~1 km Radius verschleiert</li>
+          <li>EXIF-Metadaten werden aus Fotos entfernt</li>
+          <li>Keine persönlichen Daten werden gespeichert</li>
+        </ul>
+      </div>
+
+      <div class="info-section">
+        <h3>⚙️ Technik</h3>
+        <ul>
+          <li>Karte: OpenStreetMap + Leaflet.js</li>
+          <li>Datenbank: Supabase (Frankfurt)</li>
+          <li>Hosting: Cloudflare Pages</li>
+          <li>Domain: 32-er.com</li>
+          <li>Kosten: 0 €/Monat</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav id="nav">
+    <button class="nav-btn active" onclick="showScreen('map')" id="nav-map">
+      <span class="icon">🗺</span>Karte
+    </button>
+    <button class="nav-btn" onclick="showScreen('stickers')" id="nav-stickers">
+      <span class="icon">📌</span>Sticker
+    </button>
+    <button class="nav-btn add-btn" onclick="openAddOverlay()" id="nav-add">
+      <span class="icon" style="font-size:28px">+</span>
+      <span>Neu</span>
+    </button>
+    <button class="nav-btn" onclick="showScreen('score')" id="nav-score">
+      <span class="icon">🏆</span>Score
+    </button>
+    <button class="nav-btn" onclick="showScreen('info')" id="nav-info">
+      <span class="icon">ℹ️</span>Info
+    </button>
+  </nav>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Sticker detail modal -->
+<div id="modal-overlay" onclick="closeModal()">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════
+//  ⚙️  CONFIG
+// ═══════════════════════════════════════════════
+const SUPABASE_URL = 'https://wabunpkobqjqyhbxbtai.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_hB9Y4G_pbWWrTIEJYIukVA_tH_hyxqr';
+
+const HOME_LAT = 52.3833;
+const HOME_LNG = 13.2167;
+
+// ═══════════════════════════════════════════════
+//  SUPABASE INIT – Variable heißt jetzt "db" um Konflikt zu vermeiden
+// ═══════════════════════════════════════════════
+let db = null;
+let useSupabase = false;
+
+try {
+  const { createClient } = supabase;
+  db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  useSupabase = true;
+} catch(e) {
+  console.warn('Supabase init failed:', e);
+  document.getElementById('config-notice').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let stickers = [];
+let selectedLocation = null;
+let photoData = null;
+let map = null;
+let markersLayer = null;
+
+// ═══════════════════════════════════════════════
+//  CITIES DATABASE (Top 300+ cities worldwide)
+// ═══════════════════════════════════════════════
+const CITIES = [
+  // Germany
+  {n:'Berlin',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:52.52,lng:13.405,cap:true,cont:'EU'},
+  {n:'Hamburg',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:53.55,lng:10.0,cont:'EU'},
+  {n:'München',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:48.137,lng:11.576,cont:'EU'},
+  {n:'Köln',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:50.938,lng:6.96,cont:'EU'},
+  {n:'Frankfurt',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:50.11,lng:8.682,cont:'EU'},
+  {n:'Stuttgart',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:48.78,lng:9.18,cont:'EU'},
+  {n:'Düsseldorf',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:51.22,lng:6.78,cont:'EU'},
+  {n:'Leipzig',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:51.34,lng:12.38,cont:'EU'},
+  {n:'Dortmund',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:51.52,lng:7.46,cont:'EU'},
+  {n:'Dresden',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:51.05,lng:13.74,cont:'EU'},
+  {n:'Bremen',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:53.08,lng:8.81,cont:'EU'},
+  {n:'Potsdam',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:52.39,lng:13.06,cont:'EU'},
+  {n:'Stahnsdorf',c:'Deutschland',cc:'DE',f:'🇩🇪',lat:52.3833,lng:13.2167,cont:'EU'},
+  // Europe
+  {n:'London',c:'Großbritannien',cc:'GB',f:'🇬🇧',lat:51.51,lng:-0.128,cap:true,cont:'EU'},
+  {n:'Paris',c:'Frankreich',cc:'FR',f:'🇫🇷',lat:48.857,lng:2.347,cap:true,cont:'EU'},
+  {n:'Madrid',c:'Spanien',cc:'ES',f:'🇪🇸',lat:40.416,lng:-3.703,cap:true,cont:'EU'},
+  {n:'Barcelona',c:'Spanien',cc:'ES',f:'🇪🇸',lat:41.387,lng:2.169,cont:'EU'},
+  {n:'Rom',c:'Italien',cc:'IT',f:'🇮🇹',lat:41.9,lng:12.5,cap:true,cont:'EU'},
+  {n:'Mailand',c:'Italien',cc:'IT',f:'🇮🇹',lat:45.466,lng:9.19,cont:'EU'},
+  {n:'Amsterdam',c:'Niederlande',cc:'NL',f:'🇳🇱',lat:52.37,lng:4.9,cap:true,cont:'EU'},
+  {n:'Brüssel',c:'Belgien',cc:'BE',f:'🇧🇪',lat:50.85,lng:4.35,cap:true,cont:'EU'},
+  {n:'Wien',c:'Österreich',cc:'AT',f:'🇦🇹',lat:48.21,lng:16.37,cap:true,cont:'EU'},
+  {n:'Zürich',c:'Schweiz',cc:'CH',f:'🇨🇭',lat:47.38,lng:8.54,cont:'EU'},
+  {n:'Bern',c:'Schweiz',cc:'CH',f:'🇨🇭',lat:46.95,lng:7.45,cap:true,cont:'EU'},
+  {n:'Prag',c:'Tschechien',cc:'CZ',f:'🇨🇿',lat:50.08,lng:14.47,cap:true,cont:'EU'},
+  {n:'Warschau',c:'Polen',cc:'PL',f:'🇵🇱',lat:52.23,lng:21.01,cap:true,cont:'EU'},
+  {n:'Budapest',c:'Ungarn',cc:'HU',f:'🇭🇺',lat:47.5,lng:19.04,cap:true,cont:'EU'},
+  {n:'Bukarest',c:'Rumänien',cc:'RO',f:'🇷🇴',lat:44.43,lng:26.1,cap:true,cont:'EU'},
+  {n:'Sofia',c:'Bulgarien',cc:'BG',f:'🇧🇬',lat:42.7,lng:23.32,cap:true,cont:'EU'},
+  {n:'Athen',c:'Griechenland',cc:'GR',f:'🇬🇷',lat:37.98,lng:23.73,cap:true,cont:'EU'},
+  {n:'Stockholm',c:'Schweden',cc:'SE',f:'🇸🇪',lat:59.33,lng:18.07,cap:true,cont:'EU'},
+  {n:'Oslo',c:'Norwegen',cc:'NO',f:'🇳🇴',lat:59.91,lng:10.75,cap:true,cont:'EU'},
+  {n:'Kopenhagen',c:'Dänemark',cc:'DK',f:'🇩🇰',lat:55.68,lng:12.57,cap:true,cont:'EU'},
+  {n:'Helsinki',c:'Finnland',cc:'FI',f:'🇫🇮',lat:60.17,lng:24.94,cap:true,cont:'EU'},
+  {n:'Lissabon',c:'Portugal',cc:'PT',f:'🇵🇹',lat:38.72,lng:-9.14,cap:true,cont:'EU'},
+  {n:'Dublin',c:'Irland',cc:'IE',f:'🇮🇪',lat:53.33,lng:-6.25,cap:true,cont:'EU'},
+  {n:'Reykjavik',c:'Island',cc:'IS',f:'🇮🇸',lat:64.14,lng:-21.94,cap:true,cont:'EU'},
+  {n:'Tallinn',c:'Estland',cc:'EE',f:'🇪🇪',lat:59.44,lng:24.75,cap:true,cont:'EU'},
+  {n:'Riga',c:'Lettland',cc:'LV',f:'🇱🇻',lat:56.95,lng:24.11,cap:true,cont:'EU'},
+  {n:'Vilnius',c:'Litauen',cc:'LT',f:'🇱🇹',lat:54.69,lng:25.28,cap:true,cont:'EU'},
+  {n:'Krakau',c:'Polen',cc:'PL',f:'🇵🇱',lat:50.06,lng:19.94,cont:'EU'},
+  {n:'Laibach',c:'Slowenien',cc:'SI',f:'🇸🇮',lat:46.05,lng:14.5,cap:true,cont:'EU'},
+  {n:'Zagreb',c:'Kroatien',cc:'HR',f:'🇭🇷',lat:45.81,lng:15.98,cap:true,cont:'EU'},
+  {n:'Belgrad',c:'Serbien',cc:'RS',f:'🇷🇸',lat:44.82,lng:20.46,cap:true,cont:'EU'},
+  {n:'Bratislava',c:'Slowakei',cc:'SK',f:'🇸🇰',lat:48.15,lng:17.11,cap:true,cont:'EU'},
+  // Americas
+  {n:'New York',c:'USA',cc:'US',f:'🇺🇸',lat:40.713,lng:-74.006,cont:'NA'},
+  {n:'Los Angeles',c:'USA',cc:'US',f:'🇺🇸',lat:34.052,lng:-118.244,cont:'NA'},
+  {n:'Chicago',c:'USA',cc:'US',f:'🇺🇸',lat:41.878,lng:-87.630,cont:'NA'},
+  {n:'Houston',c:'USA',cc:'US',f:'🇺🇸',lat:29.76,lng:-95.37,cont:'NA'},
+  {n:'Miami',c:'USA',cc:'US',f:'🇺🇸',lat:25.77,lng:-80.19,cont:'NA'},
+  {n:'San Francisco',c:'USA',cc:'US',f:'🇺🇸',lat:37.77,lng:-122.42,cont:'NA'},
+  {n:'Seattle',c:'USA',cc:'US',f:'🇺🇸',lat:47.61,lng:-122.33,cont:'NA'},
+  {n:'Washington D.C.',c:'USA',cc:'US',f:'🇺🇸',lat:38.91,lng:-77.04,cap:true,cont:'NA'},
+  {n:'Las Vegas',c:'USA',cc:'US',f:'🇺🇸',lat:36.17,lng:-115.14,cont:'NA'},
+  {n:'Boston',c:'USA',cc:'US',f:'🇺🇸',lat:42.36,lng:-71.06,cont:'NA'},
+  {n:'Toronto',c:'Kanada',cc:'CA',f:'🇨🇦',lat:43.65,lng:-79.38,cont:'NA'},
+  {n:'Vancouver',c:'Kanada',cc:'CA',f:'🇨🇦',lat:49.25,lng:-123.12,cont:'NA'},
+  {n:'Montreal',c:'Kanada',cc:'CA',f:'🇨🇦',lat:45.5,lng:-73.57,cont:'NA'},
+  {n:'Ottawa',c:'Kanada',cc:'CA',f:'🇨🇦',lat:45.42,lng:-75.7,cap:true,cont:'NA'},
+  {n:'Mexico City',c:'Mexiko',cc:'MX',f:'🇲🇽',lat:19.43,lng:-99.13,cap:true,cont:'NA'},
+  {n:'São Paulo',c:'Brasilien',cc:'BR',f:'🇧🇷',lat:-23.55,lng:-46.63,cont:'SA'},
+  {n:'Rio de Janeiro',c:'Brasilien',cc:'BR',f:'🇧🇷',lat:-22.91,lng:-43.17,cont:'SA'},
+  {n:'Brasília',c:'Brasilien',cc:'BR',f:'🇧🇷',lat:-15.78,lng:-47.93,cap:true,cont:'SA'},
+  {n:'Buenos Aires',c:'Argentinien',cc:'AR',f:'🇦🇷',lat:-34.6,lng:-58.38,cap:true,cont:'SA'},
+  {n:'Bogotá',c:'Kolumbien',cc:'CO',f:'🇨🇴',lat:4.71,lng:-74.07,cap:true,cont:'SA'},
+  {n:'Lima',c:'Peru',cc:'PE',f:'🇵🇪',lat:-12.05,lng:-77.04,cap:true,cont:'SA'},
+  {n:'Santiago',c:'Chile',cc:'CL',f:'🇨🇱',lat:-33.45,lng:-70.67,cap:true,cont:'SA'},
+  {n:'Caracas',c:'Venezuela',cc:'VE',f:'🇻🇪',lat:10.5,lng:-66.92,cap:true,cont:'SA'},
+  {n:'Havanna',c:'Kuba',cc:'CU',f:'🇨🇺',lat:23.14,lng:-82.36,cap:true,cont:'NA'},
+  // Asia
+  {n:'Tokio',c:'Japan',cc:'JP',f:'🇯🇵',lat:35.69,lng:139.69,cap:true,cont:'AS'},
+  {n:'Osaka',c:'Japan',cc:'JP',f:'🇯🇵',lat:34.69,lng:135.5,cont:'AS'},
+  {n:'Kyoto',c:'Japan',cc:'JP',f:'🇯🇵',lat:35.02,lng:135.76,cont:'AS'},
+  {n:'Seoul',c:'Südkorea',cc:'KR',f:'🇰🇷',lat:37.57,lng:126.98,cap:true,cont:'AS'},
+  {n:'Peking',c:'China',cc:'CN',f:'🇨🇳',lat:39.91,lng:116.39,cap:true,cont:'AS'},
+  {n:'Shanghai',c:'China',cc:'CN',f:'🇨🇳',lat:31.23,lng:121.47,cont:'AS'},
+  {n:'Shenzhen',c:'China',cc:'CN',f:'🇨🇳',lat:22.54,lng:114.06,cont:'AS'},
+  {n:'Hongkong',c:'Hongkong',cc:'HK',f:'🇭🇰',lat:22.32,lng:114.17,cont:'AS'},
+  {n:'Singapur',c:'Singapur',cc:'SG',f:'🇸🇬',lat:1.35,lng:103.82,cap:true,cont:'AS'},
+  {n:'Bangkok',c:'Thailand',cc:'TH',f:'🇹🇭',lat:13.75,lng:100.52,cap:true,cont:'AS'},
+  {n:'Jakarta',c:'Indonesien',cc:'ID',f:'🇮🇩',lat:-6.21,lng:106.85,cap:true,cont:'AS'},
+  {n:'Kuala Lumpur',c:'Malaysia',cc:'MY',f:'🇲🇾',lat:3.14,lng:101.69,cap:true,cont:'AS'},
+  {n:'Manila',c:'Philippinen',cc:'PH',f:'🇵🇭',lat:14.6,lng:120.98,cap:true,cont:'AS'},
+  {n:'Ho-Chi-Minh-Stadt',c:'Vietnam',cc:'VN',f:'🇻🇳',lat:10.82,lng:106.63,cont:'AS'},
+  {n:'Hanoi',c:'Vietnam',cc:'VN',f:'🇻🇳',lat:21.03,lng:105.85,cap:true,cont:'AS'},
+  {n:'Mumbai',c:'Indien',cc:'IN',f:'🇮🇳',lat:19.08,lng:72.88,cont:'AS'},
+  {n:'Delhi',c:'Indien',cc:'IN',f:'🇮🇳',lat:28.66,lng:77.23,cap:true,cont:'AS'},
+  {n:'Bangalore',c:'Indien',cc:'IN',f:'🇮🇳',lat:12.97,lng:77.59,cont:'AS'},
+  {n:'Karachi',c:'Pakistan',cc:'PK',f:'🇵🇰',lat:24.86,lng:67.01,cont:'AS'},
+  {n:'Islamabad',c:'Pakistan',cc:'PK',f:'🇵🇰',lat:33.68,lng:73.05,cap:true,cont:'AS'},
+  {n:'Dhaka',c:'Bangladesch',cc:'BD',f:'🇧🇩',lat:23.81,lng:90.41,cap:true,cont:'AS'},
+  {n:'Kabul',c:'Afghanistan',cc:'AF',f:'🇦🇫',lat:34.53,lng:69.17,cap:true,cont:'AS'},
+  {n:'Teheran',c:'Iran',cc:'IR',f:'🇮🇷',lat:35.69,lng:51.42,cap:true,cont:'AS'},
+  {n:'Istanbul',c:'Türkei',cc:'TR',f:'🇹🇷',lat:41.01,lng:28.96,cont:'AS'},
+  {n:'Ankara',c:'Türkei',cc:'TR',f:'🇹🇷',lat:39.93,lng:32.86,cap:true,cont:'AS'},
+  {n:'Riad',c:'Saudi-Arabien',cc:'SA',f:'🇸🇦',lat:24.69,lng:46.72,cap:true,cont:'AS'},
+  {n:'Dubai',c:'Vereinigte Arabische Emirate',cc:'AE',f:'🇦🇪',lat:25.2,lng:55.27,cont:'AS'},
+  {n:'Abu Dhabi',c:'Vereinigte Arabische Emirate',cc:'AE',f:'🇦🇪',lat:24.47,lng:54.37,cap:true,cont:'AS'},
+  {n:'Doha',c:'Katar',cc:'QA',f:'🇶🇦',lat:25.29,lng:51.53,cap:true,cont:'AS'},
+  {n:'Tel Aviv',c:'Israel',cc:'IL',f:'🇮🇱',lat:32.09,lng:34.78,cont:'AS'},
+  {n:'Jerusalem',c:'Israel',cc:'IL',f:'🇮🇱',lat:31.77,lng:35.23,cap:true,cont:'AS'},
+  {n:'Beirut',c:'Libanon',cc:'LB',f:'🇱🇧',lat:33.89,lng:35.5,cap:true,cont:'AS'},
+  {n:'Bagdad',c:'Irak',cc:'IQ',f:'🇮🇶',lat:33.34,lng:44.4,cap:true,cont:'AS'},
+  {n:'Ulaanbaatar',c:'Mongolei',cc:'MN',f:'🇲🇳',lat:47.9,lng:106.88,cap:true,cont:'AS'},
+  {n:'Kathmandu',c:'Nepal',cc:'NP',f:'🇳🇵',lat:27.7,lng:85.32,cap:true,cont:'AS'},
+  {n:'Colombo',c:'Sri Lanka',cc:'LK',f:'🇱🇰',lat:6.93,lng:79.85,cap:true,cont:'AS'},
+  {n:'Taipei',c:'Taiwan',cc:'TW',f:'🇹🇼',lat:25.05,lng:121.53,cap:true,cont:'AS'},
+  // Africa
+  {n:'Kairo',c:'Ägypten',cc:'EG',f:'🇪🇬',lat:30.06,lng:31.25,cap:true,cont:'AF'},
+  {n:'Lagos',c:'Nigeria',cc:'NG',f:'🇳🇬',lat:6.45,lng:3.4,cont:'AF'},
+  {n:'Kinshasa',c:'DR Kongo',cc:'CD',f:'🇨🇩',lat:-4.32,lng:15.32,cap:true,cont:'AF'},
+  {n:'Johannesburg',c:'Südafrika',cc:'ZA',f:'🇿🇦',lat:-26.2,lng:28.04,cont:'AF'},
+  {n:'Kapstadt',c:'Südafrika',cc:'ZA',f:'🇿🇦',lat:-33.93,lng:18.42,cont:'AF'},
+  {n:'Pretoria',c:'Südafrika',cc:'ZA',f:'🇿🇦',lat:-25.74,lng:28.19,cap:true,cont:'AF'},
+  {n:'Nairobi',c:'Kenia',cc:'KE',f:'🇰🇪',lat:-1.29,lng:36.82,cap:true,cont:'AF'},
+  {n:'Addis Abeba',c:'Äthiopien',cc:'ET',f:'🇪🇹',lat:9.03,lng:38.74,cap:true,cont:'AF'},
+  {n:'Dar es Salaam',c:'Tansania',cc:'TZ',f:'🇹🇿',lat:-6.79,lng:39.21,cont:'AF'},
+  {n:'Casablanca',c:'Marokko',cc:'MA',f:'🇲🇦',lat:33.59,lng:-7.62,cont:'AF'},
+  {n:'Rabat',c:'Marokko',cc:'MA',f:'🇲🇦',lat:34.01,lng:-6.84,cap:true,cont:'AF'},
+  {n:'Algier',c:'Algerien',cc:'DZ',f:'🇩🇿',lat:36.74,lng:3.06,cap:true,cont:'AF'},
+  {n:'Tunis',c:'Tunesien',cc:'TN',f:'🇹🇳',lat:36.82,lng:10.17,cap:true,cont:'AF'},
+  {n:'Accra',c:'Ghana',cc:'GH',f:'🇬🇭',lat:5.56,lng:-0.2,cap:true,cont:'AF'},
+  {n:'Dakar',c:'Senegal',cc:'SN',f:'🇸🇳',lat:14.69,lng:-17.45,cap:true,cont:'AF'},
+  {n:'Khartoum',c:'Sudan',cc:'SD',f:'🇸🇩',lat:15.56,lng:32.53,cap:true,cont:'AF'},
+  {n:'Abidjan',c:'Elfenbeinküste',cc:'CI',f:'🇨🇮',lat:5.35,lng:-4.0,cont:'AF'},
+  {n:'Luanda',c:'Angola',cc:'AO',f:'🇦🇴',lat:-8.84,lng:13.23,cap:true,cont:'AF'},
+  {n:'Maputo',c:'Mosambik',cc:'MZ',f:'🇲🇿',lat:-25.97,lng:32.57,cap:true,cont:'AF'},
+  // Oceania
+  {n:'Sydney',c:'Australien',cc:'AU',f:'🇦🇺',lat:-33.87,lng:151.21,cont:'OC'},
+  {n:'Melbourne',c:'Australien',cc:'AU',f:'🇦🇺',lat:-37.81,lng:144.96,cont:'OC'},
+  {n:'Brisbane',c:'Australien',cc:'AU',f:'🇦🇺',lat:-27.47,lng:153.03,cont:'OC'},
+  {n:'Perth',c:'Australien',cc:'AU',f:'🇦🇺',lat:-31.95,lng:115.86,cont:'OC'},
+  {n:'Canberra',c:'Australien',cc:'AU',f:'🇦🇺',lat:-35.28,lng:149.13,cap:true,cont:'OC'},
+  {n:'Auckland',c:'Neuseeland',cc:'NZ',f:'🇳🇿',lat:-36.87,lng:174.77,cont:'OC'},
+  {n:'Wellington',c:'Neuseeland',cc:'NZ',f:'🇳🇿',lat:-41.29,lng:174.78,cap:true,cont:'OC'},
+  {n:'Suva',c:'Fidschi',cc:'FJ',f:'🇫🇯',lat:-18.14,lng:178.44,cap:true,cont:'OC'},
+  {n:'Port Moresby',c:'Papua-Neuguinea',cc:'PG',f:'🇵🇬',lat:-9.44,lng:147.18,cap:true,cont:'OC'},
+  // Russia / Central Asia
+  {n:'Moskau',c:'Russland',cc:'RU',f:'🇷🇺',lat:55.75,lng:37.62,cap:true,cont:'EU'},
+  {n:'Sankt Petersburg',c:'Russland',cc:'RU',f:'🇷🇺',lat:59.94,lng:30.32,cont:'EU'},
+  {n:'Nowosibirsk',c:'Russland',cc:'RU',f:'🇷🇺',lat:55.03,lng:82.92,cont:'AS'},
+  {n:'Jekaterinburg',c:'Russland',cc:'RU',f:'🇷🇺',lat:56.83,lng:60.6,cont:'EU'},
+  {n:'Wladiwostok',c:'Russland',cc:'RU',f:'🇷🇺',lat:43.13,lng:131.9,cont:'AS'},
+  {n:'Astana',c:'Kasachstan',cc:'KZ',f:'🇰🇿',lat:51.18,lng:71.45,cap:true,cont:'AS'},
+  {n:'Taschkent',c:'Usbekistan',cc:'UZ',f:'🇺🇿',lat:41.3,lng:69.27,cap:true,cont:'AS'},
+  // Caribbean / Pacific
+  {n:'Nassau',c:'Bahamas',cc:'BS',f:'🇧🇸',lat:25.04,lng:-77.35,cap:true,cont:'NA'},
+  {n:'Kingston',c:'Jamaika',cc:'JM',f:'🇯🇲',lat:18.0,lng:-76.79,cap:true,cont:'NA'},
+  {n:'Port of Spain',c:'Trinidad und Tobago',cc:'TT',f:'🇹🇹',lat:10.65,lng:-61.52,cap:true,cont:'NA'},
+  {n:'Honolulu',c:'USA (Hawaii)',cc:'US',f:'🇺🇸',lat:21.31,lng:-157.82,cont:'OC'},
+  {n:'Papeete',c:'Französisch-Polynesien',cc:'PF',f:'🇵🇫',lat:-17.54,lng:-149.57,cap:true,cont:'OC'},
+];
+
+// ═══════════════════════════════════════════════
+//  POINTS CALCULATION
+// ═══════════════════════════════════════════════
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getDistancePoints(km) {
+  if (km >= 10000) return 25;
+  if (km >= 5000) return 10;
+  if (km >= 2000) return 5;
+  return 1;
+}
+
+function calcPoints(city, hasPhoto, existingCountries) {
+  const km = haversine(HOME_LAT, HOME_LNG, city.lat, city.lng);
+  let pts = getDistancePoints(km);
+  if (hasPhoto) pts += 5;
+  if (city.cap) pts += 3;
+  if (!existingCountries.includes(city.cc)) pts += 10;
+  return { total: pts, km: Math.round(km), dist: getDistancePoints(km), photo: hasPhoto?5:0, capital: city.cap?3:0, newCountry: !existingCountries.includes(city.cc)?10:0 };
+}
+
+function getContinent(city) {
+  const map = { EU:'Europa', NA:'Nordamerika', SA:'Südamerika', AS:'Asien', AF:'Afrika', OC:'Ozeanien' };
+  return map[city.cont] || '?';
+}
+
+// ═══════════════════════════════════════════════
+//  ANONYMIZE
+// ═══════════════════════════════════════════════
+function anonymize(lat, lng) {
+  const fuzz = 0.008; // ~1km
+  return {
+    lat: lat + (Math.random()-0.5)*fuzz*2,
+    lng: lng + (Math.random()-0.5)*fuzz*2
+  };
+}
+
+async function stripExif(file) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      canvas.width = Math.min(img.width, 1600);
+      canvas.height = Math.round(img.height * (canvas.width/img.width));
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(resolve, 'image/jpeg', 0.85);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => resolve(file);
+    img.src = url;
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════════
+async function loadStickers() {
+  if (useSupabase) {
+    try {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 5000)
+      );
+      const fetch = db.from('stickers').select('*').order('created_at', { ascending: false });
+      const { data, error } = await Promise.race([fetch, timeout]);
+      if (error) throw error;
+      return data || [];
+    } catch(e) {
+      console.error('Load error:', e);
+      if (e.message !== 'timeout') toast('Ladefehler – zeige lokale Daten', 'error');
+      return loadLocal();
+    }
+  }
+  return loadLocal();
+}
+
+function loadLocal() {
+  try { return JSON.parse(localStorage.getItem('32er_stickers') || '[]'); }
+  catch { return []; }
+}
+
+function saveLocal(s) {
+  try { localStorage.setItem('32er_stickers', JSON.stringify(s)); } catch {}
+}
+
+async function saveSticker(sticker) {
+  if (useSupabase) {
+    try {
+      let photoUrl = null;
+      if (sticker.photoData) {
+        const blob = await (await fetch(sticker.photoData)).blob();
+        const filename = `sticker_${Date.now()}.jpg`;
+        const { data, error } = await db.storage
+          .from('sticker-photos')
+          .upload(filename, blob, { contentType: 'image/jpeg' });
+        if (!error) {
+          const { data: urlData } = db.storage.from('sticker-photos').getPublicUrl(filename);
+          photoUrl = urlData.publicUrl;
+        }
+      }
+      const row = {
+        city: sticker.city,
+        country: sticker.country,
+        country_code: sticker.countryCode,
+        flag: sticker.flag,
+        lat: sticker.lat,
+        lng: sticker.lng,
+        points: sticker.points,
+        distance_km: sticker.distanceKm,
+        is_capital: sticker.isCapital || false,
+        continent: sticker.continent,
+        note: sticker.note || null,
+        photo_url: photoUrl,
+        pts_breakdown: sticker.breakdown,
+        username: sticker.username || null,
+        session_id: sticker.session_id || null
+      };
+      const { data, error } = await db.from('stickers').insert([row]).select().single();
+      if (error) throw error;
+      return data;
+    } catch(e) {
+      console.error('Save error:', e);
+      toast('Speicherfehler – lokal gespeichert', 'error');
+      return saveLocalFallback(sticker);
+    }
+  }
+  return saveLocalFallback(sticker);
+}
+
+function saveLocalFallback(sticker) {
+  const local = loadLocal();
+  const s = { ...sticker, id: Date.now(), created_at: new Date().toISOString() };
+  local.unshift(s);
+  saveLocal(local);
+  return s;
+}
+
+// ═══════════════════════════════════════════════
+//  MAP
+// ═══════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', {
+    center: [30, 10],
+    zoom: 2,
+    zoomControl: false,
+    attributionControl: false
+  });
+
+  L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  markersLayer = L.layerGroup().addTo(map);
+}
+
+function renderMarkers() {
+  if (!markersLayer) return;
+  markersLayer.clearLayers();
+
+  stickers.forEach(s => {
+    const lat = s.lat || s.city_lat;
+    const lng = s.lng || s.city_lng;
+    if (!lat || !lng) return;
+
+    const pts = s.points || s.pts || 0;
+    const size = pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22;
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="map-marker" style="width:${size}px;height:${size}px;font-size:${size*0.38}px">${pts}</div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2]
+    });
+
+    const marker = L.marker([lat, lng], { icon });
+    marker.bindPopup(`
+      <div style="min-width:160px">
+        <div style="font-size:24px;margin-bottom:4px">${s.flag||'📍'}</div>
+        <div style="font-weight:700;font-size:15px;color:#f0f0f8">${s.city}</div>
+        <div style="font-size:12px;color:#8888aa;margin-bottom:8px">${s.country}</div>
+        ${s.photo_url ? `<img src="${s.photo_url}" style="width:100%;border-radius:8px;margin-bottom:8px;max-height:120px;object-fit:cover">` : ''}
+        <div style="font-size:20px;font-weight:800;color:#e8c84a">${pts} Punkte</div>
+        ${s.note ? `<div style="font-size:12px;color:#8888aa;margin-top:4px">${s.note}</div>` : ''}
+      </div>
+    `);
+    markersLayer.addLayer(marker);
+  });
+
+  updateMapStats();
+}
+
+function updateMapStats() {
+  document.getElementById('stat-pins').textContent = stickers.length;
+  const countries = new Set(stickers.map(s => s.country_code || s.countryCode || s.cc)).size;
+  document.getElementById('stat-countries').textContent = countries;
+}
+
+// ═══════════════════════════════════════════════
+//  PIN-SCREEN CITY SEARCH (Schritt 1)
+// ═══════════════════════════════════════════════
+let pinSearchTimeout;
+let pinMap = null;
+let pinReverseTimeout;
+
+document.getElementById('pin-city-input').addEventListener('input', function() {
+  clearTimeout(pinSearchTimeout);
+  pinSearchTimeout = setTimeout(() => doPinSearch(this.value.trim()), 200);
+});
+document.getElementById('pin-city-input').addEventListener('blur', function() {
+  setTimeout(() => document.getElementById('pin-suggestions').classList.remove('open'), 200);
+});
+
+function doPinSearch(q) {
+  const sug = document.getElementById('pin-suggestions');
+  if (q.length < 2) { sug.classList.remove('open'); return; }
+
+  const ql = q.toLowerCase();
+  const results = CITIES.filter(c =>
+    c.n.toLowerCase().startsWith(ql) ||
+    c.n.toLowerCase().includes(ql) ||
+    c.c.toLowerCase().includes(ql)
+  ).slice(0, 8);
+
+  if (!results.length) { sug.classList.remove('open'); return; }
+
+  sug.innerHTML = results.map(c => {
+    const km = Math.round(haversine(HOME_LAT, HOME_LNG, c.lat, c.lng));
+    return `<div class="suggestion-item" onclick="selectPinCity(${CITIES.indexOf(c)})">
+      <span class="flag">${c.f}</span>
+      <span style="flex:1;padding:0 8px">
+        <strong>${c.n}</strong>
+        <span style="color:var(--text2);font-size:12px;display:block">${c.c}${c.cap?' 🏛':''}</span>
+      </span>
+      <span class="pop">${km > 1000 ? Math.round(km/100)/10+'k' : km} km</span>
+    </div>`;
+  }).join('');
+  sug.classList.add('open');
+}
+
+function selectPinCity(idx) {
+  const city = CITIES[idx];
+  document.getElementById('pin-city-input').value = city.n;
+  document.getElementById('pin-suggestions').classList.remove('open');
+
+  // Karte auf Stadt fliegen
+  if (pinMap) {
+    pinMap.setView([city.lat, city.lng], 13, { animate: true });
+    updatePinLocationBar(city);
+  }
+}
+
+// Aktualisiert die Info-Leiste am unteren Rand der Pin-Karte
+function updatePinLocationBar(city) {
+  if (!city) {
+    document.getElementById('pin-loc-city').textContent = 'Karte verschieben oder Stadt suchen';
+    document.getElementById('pin-loc-sub').textContent = 'Tippe auf deinen Sticker-Spot';
+    document.getElementById('pin-loc-pts').style.display = 'none';
+    document.getElementById('pin-loc-flag').textContent = '🌍';
+    document.getElementById('pin-confirm-btn').disabled = true;
+    selectedLocation = null;
+    return;
+  }
+
+  const existingCountries = stickers.map(s => s.country_code || s.countryCode || s.cc);
+  const pts = calcPoints(city, !!photoData, existingCountries);
+  selectedLocation = { ...city, pts };
+
+  document.getElementById('pin-loc-flag').textContent = city.f || '📍';
+  document.getElementById('pin-loc-city').textContent = `${city.n}, ${city.c}`;
+  document.getElementById('pin-loc-sub').textContent = `${pts.km.toLocaleString('de')} km von Stahnsdorf${city.cap ? ' · 🏛 Hauptstadt' : ''}`;
+  document.getElementById('pin-pts-val').textContent = pts.total;
+  document.getElementById('pin-loc-pts').style.display = 'block';
+  document.getElementById('pin-confirm-btn').disabled = false;
+}
+
+// Findet nächste Stadt zur Pin-Position
+function findNearestCity(lat, lng) {
+  let best = null, bestDist = Infinity;
+  CITIES.forEach(c => {
+    const d = haversine(lat, lng, c.lat, c.lng);
+    if (d < bestDist) { bestDist = d; best = c; }
+  });
+  return bestDist < 200 ? best : null; // Max 200km Radius zur nächsten Stadt
+}
+
+// ═══════════════════════════════════════════════
+//  PIN SCREEN OPEN / CLOSE
+// ═══════════════════════════════════════════════
+function openPinScreen(keepLocation = false) {
+  document.getElementById('pin-screen').classList.add('open');
+  document.getElementById('pin-city-input').value = '';
+  if (!keepLocation) {
+    updatePinLocationBar(null);
+  }
+
+  // Pin-Karte initialisieren (lazy)
+  setTimeout(() => {
+    if (!pinMap) {
+      pinMap = L.map('pin-map-leaflet', {
+        center: map ? map.getCenter() : [30, 10],
+        zoom: map ? Math.max(map.getZoom(), 4) : 3,
+        zoomControl: false,
+        attributionControl: false
+      });
+      L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '© OpenStreetMap'
+      }).addTo(pinMap);
+
+      // Bei Karte bewegen → nächste Stadt suchen
+      pinMap.on('moveend', onPinMapMove);
+      pinMap.on('movestart', () => {
+        document.getElementById('pin-crosshair').classList.add('dragging');
+      });
+      pinMap.on('move', () => {
+        clearTimeout(pinReverseTimeout);
+      });
+
+      if (keepLocation && selectedLocation) {
+        pinMap.setView([selectedLocation.lat, selectedLocation.lng], 12);
+        updatePinLocationBar(selectedLocation);
+      }
+    } else {
+      pinMap.invalidateSize();
+      // Wenn schon eine Location gewählt war, zentrieren
+      if (selectedLocation) {
+        pinMap.setView([selectedLocation.lat, selectedLocation.lng], 10);
+      }
+    }
+  }, 100);
+}
+
+function onPinMapMove() {
+  document.getElementById('pin-crosshair').classList.remove('dragging');
+  const center = pinMap.getCenter();
+  const zoom = pinMap.getZoom();
+
+  // Ab Zoom 5 versuchen wir die nächste Stadt zu finden
+  if (zoom >= 4) {
+    clearTimeout(pinReverseTimeout);
+    pinReverseTimeout = setTimeout(() => {
+      const city = findNearestCity(center.lat, center.lng);
+      updatePinLocationBar(city || null);
+    }, 300);
+  } else {
+    updatePinLocationBar(null);
+  }
+}
+
+function closePinScreen(abort = true) {
+  document.getElementById('pin-screen').classList.remove('open');
+  if (abort) selectedLocation = null;
+}
+
+function confirmPinLocation() {
+  if (!selectedLocation) return;
+  // Schritt 1 fertig → Schritt 2: Details-Overlay öffnen
+  closePinScreen(false); // false = selectedLocation behalten!
+  openDetailsOverlay();
+}
+
+function goBackToMap() {
+  closeAddOverlay();
+  const savedLoc = selectedLocation;
+  openPinScreen(true); // keepLocation=true → selectedLocation bleibt erhalten
+  if (savedLoc) {
+    setTimeout(() => {
+      if (pinMap) pinMap.setView([savedLoc.lat, savedLoc.lng], 10, { animate: true });
+      updatePinLocationBar(savedLoc);
+    }, 250);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  ADD OVERLAY (Schritt 2: Details)
+// ═══════════════════════════════════════════════
+function openDetailsOverlay() {
+  // Infos aus selectedLocation befüllen
+  const city = selectedLocation;
+  const existingCountries = stickers.map(s => s.country_code || s.countryCode || s.cc);
+  const pts = calcPoints(city, !!photoData, existingCountries);
+  selectedLocation = { ...city, pts };
+
+  document.getElementById('confirm-flag').textContent = city.f || '📍';
+  document.getElementById('confirm-city').textContent = `${city.n}, ${city.c}`;
+  document.getElementById('confirm-country').textContent = `${pts.km.toLocaleString('de')} km von Stahnsdorf`;
+  document.getElementById('confirm-pts').textContent = pts.total;
+
+  const badges = [];
+  if (city.cap) badges.push('<span class="badge badge-capital">🏛 Hauptstadt</span>');
+  if (!existingCountries.includes(city.cc)) badges.push('<span class="badge badge-newcountry">🌍 Neues Land!</span>');
+  document.getElementById('confirm-badges').innerHTML = badges.join('');
+
+  // Punkte-Aufschlüsselung
+  document.getElementById('bd-dist').textContent = `+${pts.dist}`;
+  document.getElementById('bd-capital-row').style.display = pts.capital ? '' : 'none';
+  document.getElementById('bd-newcountry-row').style.display = pts.newCountry ? '' : 'none';
+  document.getElementById('bd-photo-row').style.display = pts.photo ? '' : 'none';
+  document.getElementById('bd-total').textContent = `${pts.total} Pkt`;
+  document.getElementById('pts-breakdown').classList.add('show');
+
+  showScreen('map');
+  setTimeout(() => {
+    document.getElementById('add-overlay').classList.add('open');
+    document.getElementById('overlay-dimmer').classList.add('show');
+  }, 100);
+}
+
+// ═══════════════════════════════════════════════
+//  PHOTO HANDLING
+// ═══════════════════════════════════════════════
+document.getElementById('photo-input').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5*1024*1024) { toast('Foto zu groß (max 5 MB)', 'error'); return; }
+
+  toast('📷 Verarbeite Foto…');
+  const clean = await stripExif(file);
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    photoData = ev.target.result;
+    document.getElementById('photo-preview').src = photoData;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-upload-btn').style.display = 'none';
+    if (selectedLocation) {
+      const existing = stickers.map(s => s.country_code || s.countryCode || s.cc);
+      const pts = calcPoints(selectedLocation, true, existing);
+      selectedLocation.pts = pts;
+      document.getElementById('confirm-pts').textContent = pts.total;
+      document.getElementById('pin-pts-val').textContent = pts.total;
+      // Breakdown aktualisieren
+      document.getElementById('bd-dist').textContent = `+${pts.dist}`;
+      document.getElementById('bd-photo-row').style.display = 'flex';
+      document.getElementById('bd-total').textContent = `${pts.total} Pkt`;
+    }
+    toast('📷 Foto hinzugefügt!', 'success');
+  };
+  reader.readAsDataURL(clean);
+});
+
+// ═══════════════════════════════════════════════
+//  SUBMIT
+// ═══════════════════════════════════════════════
+async function submitSticker() {
+  if (!selectedLocation) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Speichere…';
+
+  const anon = anonymize(selectedLocation.lat, selectedLocation.lng);
+  const existing = stickers.map(s => s.country_code || s.countryCode || s.cc);
+  const ptsData = calcPoints(selectedLocation, !!photoData, existing);
+
+  const sticker = {
+    city: selectedLocation.n,
+    country: selectedLocation.c,
+    countryCode: selectedLocation.cc,
+    cc: selectedLocation.cc,
+    flag: selectedLocation.f,
+    lat: anon.lat,
+    lng: anon.lng,
+    city_lat: anon.lat,
+    city_lng: anon.lng,
+    points: ptsData.total,
+    pts: ptsData.total,
+    distanceKm: ptsData.km,
+    isCapital: selectedLocation.cap || false,
+    continent: selectedLocation.cont,
+    note: document.getElementById('note-input').value.trim(),
+    photoData: photoData,
+    breakdown: ptsData,
+    username: myUsername || null,
+    session_id: mySessionId
+  };
+
+  try {
+    const saved = await saveSticker(sticker);
+    stickers.unshift({ ...sticker, ...saved });
+    renderMarkers();
+    renderStickerList();
+    updateScore();
+
+    // Reset form
+    selectedLocation = null;
+    photoData = null;
+    document.getElementById('note-input').value = '';
+    document.getElementById('photo-input').value = '';
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-upload-btn').style.display = 'block';
+    btn.textContent = '🎯 Sticker speichern';
+
+    toast(`🎉 +${ptsData.total} Punkte! Sticker gesetzt in ${sticker.city}`, 'success');
+    closeAddOverlay();
+    showScreen('map');
+
+    // Fly to marker
+    setTimeout(() => {
+      map.setView([anon.lat, anon.lng], 10, { animate: true });
+    }, 500);
+
+  } catch(e) {
+    console.error('Submit error:', e);
+    toast('Fehler beim Speichern – bitte nochmal versuchen', 'error');
+    btn.disabled = false;
+    btn.textContent = '🎯 Sticker speichern';
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  STICKER LIST
+// ═══════════════════════════════════════════════
+function renderStickerList() {
+  const list = document.getElementById('sticker-list');
+  const label = document.getElementById('sticker-count-label');
+
+  if (!stickers.length) {
+    label.textContent = 'Noch keine Sticker';
+    list.innerHTML = `<div class="empty-state">
+      <div class="es-icon">📍</div>
+      <h3>Noch keine Sticker</h3>
+      <p>Sei der Erste! Setz den ersten 32er Sticker auf der Weltkarte.</p>
+    </div>`;
+    return;
+  }
+
+  label.textContent = `${stickers.length} Sticker in ${new Set(stickers.map(s=>s.country_code||s.countryCode||s.cc)).size} Ländern`;
+
+  list.innerHTML = stickers.map((s, i) => {
+    const pts = s.points || s.pts || 0;
+    const hasPhoto = s.photo_url || s.photoData;
+    const badges = [];
+    if (s.isCapital || s.is_capital) badges.push('<span class="badge badge-capital">🏛</span>');
+    if (hasPhoto) badges.push('<span class="badge badge-photo">📷</span>');
+    const date = s.created_at ? new Date(s.created_at).toLocaleDateString('de') : '';
+
+    return `<div class="sticker-card" onclick="openStickerDetail(${i})">
+      ${hasPhoto ? `<img class="sticker-photo" src="${s.photo_url||s.photoData}" loading="lazy">` : ''}
+      <div class="sticker-card-body">
+        <div class="sticker-flag">${s.flag||'📍'}</div>
+        <div class="sticker-info">
+          <div class="sticker-city">${s.city} ${badges.join('')}</div>
+          <div class="sticker-meta">${s.country} · ${(s.distanceKm||s.distance_km||0).toLocaleString('de')} km · ${date}</div>
+        </div>
+        <div class="sticker-pts">${pts}<small>Pkt</small></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openStickerDetail(idx) {
+  const s = stickers[idx];
+  const pts = s.points || s.pts || 0;
+  const hasPhoto = s.photo_url || s.photoData;
+  const b = s.breakdown || s.pts_breakdown || {};
+
+  document.getElementById('modal-content').innerHTML = `
+    ${hasPhoto ? `<img src="${s.photo_url||s.photoData}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:220px;object-fit:cover">` : ''}
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:48px">${s.flag||'📍'}</span>
+      <div>
+        <div style="font-size:20px;font-weight:800">${s.city}</div>
+        <div style="color:var(--text2);font-size:14px">${s.country}</div>
+      </div>
+      <div style="margin-left:auto;font-size:36px;font-weight:900;color:var(--accent)">${pts}<div style="font-size:11px;color:var(--text2);text-align:center">Pkt</div></div>
+    </div>
+    <div style="background:var(--surface2);border-radius:12px;padding:14px;font-size:13px;color:var(--text2)">
+      📏 ${(s.distanceKm||s.distance_km||0).toLocaleString('de')} km von Stahnsdorf<br>
+      🌍 ${getContinent({cont:s.continent||'?'})}<br>
+      ${s.isCapital||s.is_capital?'🏛 Hauptstadt<br>':''}
+      ${s.note?`<br>💬 ${s.note}`:''}
+    </div>
+    <button onclick="closeModal();showScreen('map');setTimeout(()=>map.setView([${s.lat||s.city_lat},${s.lng||s.city_lng}],12,{animate:true}),300)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:14px;cursor:pointer;margin-top:12px">
+      📍 Auf Karte zeigen
+    </button>
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════
+//  USERNAME / LEADERBOARD
+// ═══════════════════════════════════════════════
+let myUsername = localStorage.getItem('32er_username') || null;
+let mySessionId = localStorage.getItem('32er_session') || null;
+
+// Session-ID generieren falls nicht vorhanden (zur Identifikation eigener Sticker)
+if (!mySessionId) {
+  mySessionId = 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  localStorage.setItem('32er_session', mySessionId);
+}
+
+function showNameEdit() {
+  document.getElementById('username-input').value = myUsername || '';
+  document.getElementById('name-setup').classList.add('show');
+  document.getElementById('username-input').focus();
+}
+
+function saveUsername() {
+  const val = document.getElementById('username-input').value.trim();
+  if (!val || val.length < 2) { toast('Name muss mind. 2 Zeichen haben', 'error'); return; }
+  myUsername = val.slice(0, 20);
+  localStorage.setItem('32er_username', myUsername);
+  document.getElementById('name-setup').classList.remove('show');
+  updateScore();
+  loadLeaderboard();
+  toast('✅ Name gespeichert!', 'success');
+}
+
+// Enter-Taste im Username-Input
+document.getElementById('username-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveUsername();
+});
+
+async function loadLeaderboard() {
+  const list = document.getElementById('leaderboard-list');
+  list.innerHTML = '<div class="lb-loading">Lade Rangliste…</div>';
+
+  if (!useSupabase) {
+    list.innerHTML = '<div class="lb-loading">⚠️ Keine Supabase-Verbindung</div>';
+    return;
+  }
+
+  try {
+    // Alle Sticker mit username laden
+    const { data, error } = await db
+      .from('stickers')
+      .select('username, session_id, points, pts, country_code, continent, photo_url')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Gruppieren nach username (nur mit username)
+    const playerMap = {};
+    (data || []).forEach(s => {
+      const name = s.username || null;
+      const sid = s.session_id || null;
+      const key = name || sid;
+      if (!key) return;
+
+      if (!playerMap[key]) {
+        playerMap[key] = { name: name || '–', sid, pts: 0, stickers: 0, countries: new Set(), continents: new Set(), photos: 0 };
+      }
+      playerMap[key].pts += s.points || s.pts || 0;
+      playerMap[key].stickers++;
+      if (s.country_code) playerMap[key].countries.add(s.country_code);
+      if (s.continent) playerMap[key].continents.add(s.continent);
+      if (s.photo_url) playerMap[key].photos++;
+    });
+
+    // Sortieren
+    const players = Object.values(playerMap)
+      .map(p => ({ ...p, countries: p.countries.size, continents: p.continents.size }))
+      .filter(p => p.name !== '–' || p.sid === mySessionId)
+      .sort((a, b) => b.pts - a.pts);
+
+    // Eigene Position finden
+    const myKey = myUsername || mySessionId;
+    const myIdx = players.findIndex(p => p.name === myUsername || p.sid === mySessionId);
+    const myRank = myIdx >= 0 ? myIdx + 1 : null;
+
+    // Eigene Karte updaten
+    updateMyScoreCard(players[myIdx] || null, myRank, players.length);
+
+    if (!players.length) {
+      list.innerHTML = '<div class="lb-loading">Noch keine Einträge – sei der Erste!</div>';
+      return;
+    }
+
+    // Top 10 + eigene Position rendern
+    const showTop = 10;
+    let html = '';
+    const topPlayers = players.slice(0, showTop);
+
+    topPlayers.forEach((p, i) => {
+      const rank = i + 1;
+      const isMe = (p.name === myUsername && myUsername) || p.sid === mySessionId;
+      const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+      const rankClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+      html += `<div class="lb-row${isMe ? ' is-me' : ''}">
+        <div class="lb-rank ${rankClass}">${rankIcon}</div>
+        <div class="lb-name">${escHtml(p.name)}${isMe ? ' <span style="color:var(--accent);font-size:11px">(Du)</span>' : ''}
+          <small>${p.stickers} Sticker · ${p.countries} Länder</small>
+        </div>
+        <div class="lb-pts">${p.pts}<small>Pkt</small></div>
+      </div>`;
+    });
+
+    // Falls eigene Position außerhalb Top 10
+    if (myIdx >= showTop && myRank) {
+      html += '<div class="lb-separator">· · ·</div>';
+      const me = players[myIdx];
+      html += `<div class="lb-row is-me">
+        <div class="lb-rank">#${myRank}</div>
+        <div class="lb-name">${escHtml(me.name)} <span style="color:var(--accent);font-size:11px">(Du)</span>
+          <small>${me.stickers} Sticker · ${me.countries} Länder</small>
+        </div>
+        <div class="lb-pts">${me.pts}<small>Pkt</small></div>
+      </div>`;
+    }
+
+    list.innerHTML = html;
+
+  } catch(e) {
+    console.error('Leaderboard error:', e);
+    const hint = e.message?.includes('column') || e.message?.includes('username')
+      ? '<br><small style="font-size:11px;opacity:0.6">SQL fehlt: ALTER TABLE stickers ADD COLUMN IF NOT EXISTS username text; ADD COLUMN IF NOT EXISTS session_id text;</small>'
+      : '';
+    list.innerHTML = `<div class="lb-loading">⚠️ Fehler beim Laden${hint}</div>`;
+  }
+}
+
+function updateMyScoreCard(me, rank, total) {
+  // Name anzeigen / Setup einblenden
+  if (!myUsername) {
+    document.getElementById('name-setup').classList.add('show');
+    document.getElementById('my-name-text').textContent = '– kein Name –';
+    document.getElementById('my-name-sub').textContent = 'Name eingeben um mitzumachen';
+  } else {
+    document.getElementById('name-setup').classList.remove('show');
+    document.getElementById('my-name-text').textContent = myUsername;
+    document.getElementById('my-name-sub').textContent = rank ? `Platz ${rank} von ${total} Spielern` : 'Noch nicht eingetragen';
+  }
+
+  // Rang-Badge
+  const badge = document.getElementById('my-rank-badge');
+  if (rank === 1) badge.textContent = '🥇';
+  else if (rank === 2) badge.textContent = '🥈';
+  else if (rank === 3) badge.textContent = '🥉';
+  else badge.textContent = rank ? `#${rank}` : '#–';
+
+  // Stats aus lokalen stickers (eigene Session)
+  const myStickers = stickers.filter(s =>
+    (myUsername && s.username === myUsername) ||
+    (s.session_id === mySessionId) ||
+    (!s.username && !s.session_id) // Legacy ohne session
+  );
+  // Falls keine eigenen gefunden, alle lokalen nehmen (erster Launch)
+  const src = me || null;
+  const totalPts = src ? src.pts : myStickers.reduce((sum,s)=>sum+(s.points||s.pts||0),0);
+  const stickerCount = src ? src.stickers : myStickers.length;
+  const countryCount = src ? src.countries : new Set(myStickers.map(s=>s.country_code||s.countryCode||s.cc)).size;
+  const continentCount = src ? src.continents : new Set(myStickers.map(s=>s.continent)).size;
+  const photoCount = src ? src.photos : myStickers.filter(s=>s.photo_url||s.photoData).length;
+
+  document.getElementById('my-pts-big').innerHTML = `${totalPts} <small>Pkt</small>`;
+  document.getElementById('my-sticker-count').textContent = stickerCount;
+  document.getElementById('my-country-count').textContent = countryCount;
+  document.getElementById('my-continent-count').textContent = continentCount;
+  document.getElementById('my-photo-count').textContent = photoCount;
+
+  // Header
+  document.getElementById('score-header-sub').textContent = rank ? `Du bist auf Platz ${rank}` : 'Globale Rangliste';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateScore() {
+  // Score-Screen neu laden wenn aktiv
+  if (document.getElementById('screen-score').classList.contains('active')) {
+    loadLeaderboard();
+  } else {
+    // Nur eigene Karte ohne Leaderboard-Reload updaten
+    const myStickers = stickers.filter(s =>
+      (myUsername && s.username === myUsername) ||
+      s.session_id === mySessionId ||
+      (!s.username && !s.session_id)
+    );
+    updateMyScoreCard(null, null, 0);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  ADD OVERLAY
+// ═══════════════════════════════════════════════
+function openAddOverlay() {
+  // Schritt 1: Pin-Karte öffnen
+  openPinScreen();
+}
+
+function closeAddOverlay() {
+  document.getElementById('add-overlay').classList.remove('open');
+  document.getElementById('overlay-dimmer').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════
+const SCREENS = ['map', 'stickers', 'score', 'info'];
+
+function showScreen(name) {
+  SCREENS.forEach(s => {
+    document.getElementById(`screen-${s}`)?.classList.remove('active');
+    document.getElementById(`nav-${s}`)?.classList.remove('active');
+  });
+  document.getElementById(`screen-${name}`)?.classList.add('active');
+  document.getElementById(`nav-${name}`)?.classList.add('active');
+
+  if (name === 'map') { setTimeout(() => map?.invalidateSize(), 100); }
+  if (name === 'stickers') renderStickerList();
+  if (name === 'score') { updateMyScoreCard(null, null, 0); loadLeaderboard(); }
+}
+
+// ═══════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+async function init() {
+  initMap();
+  stickers = await loadStickers();
+  renderMarkers();
+  renderStickerList();
+  updateScore();
+
+  // iOS Safari: invalidate map size on viewport/orientation changes
+  const onViewportResize = () => {
+    map?.invalidateSize();
+    pinMap?.invalidateSize();
+  };
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', onViewportResize);
+  }
+  window.addEventListener('orientationchange', () => setTimeout(onViewportResize, 400));
+  window.addEventListener('resize', onViewportResize);
+
+  // Hide loading
+  setTimeout(() => {
+    document.getElementById('loading-overlay').classList.add('hidden');
+  }, 800);
+}
+
+init();
+</script>
+</body>
+</html>
