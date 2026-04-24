@@ -747,6 +747,63 @@
     backdrop-filter: blur(2px);
   }
   #overlay-dimmer.show { display: block; }
+  /* ── SCORE BREAKDOWN ── */
+  .score-breakdown {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .score-breakdown-title {
+    padding: 12px 16px;
+    font-size: 13px; font-weight: 700;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .score-bd-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .score-bd-row:last-child { border-bottom: none; }
+  .score-bd-row .bd-label { color: var(--text2); display: flex; align-items: center; gap: 8px; }
+  .score-bd-row .bd-val { font-weight: 700; color: var(--accent); }
+  .score-bd-row.bd-total { background: rgba(232,200,74,0.05); }
+  .score-bd-row.bd-total .bd-label { color: var(--text); font-weight: 700; }
+
+  /* ── ADMIN ── */
+  .admin-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+    margin-bottom: 8px;
+    -webkit-appearance: none;
+  }
+  .admin-input:focus { border-color: var(--red); }
+  .admin-delete-btn {
+    background: rgba(232,74,106,0.1);
+    border: 1px solid var(--red);
+    border-radius: 8px;
+    padding: 5px 14px;
+    color: var(--red);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+  .sticker-card-admin {
+    display: flex; justify-content: flex-end;
+    padding: 8px 14px;
+    background: rgba(232,74,106,0.04);
+    border-top: 1px solid rgba(232,74,106,0.12);
+  }
+
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -952,6 +1009,31 @@
         </div>
       </div>
 
+      <!-- Punkte-Aufschlüsselung -->
+      <div class="score-breakdown" id="score-breakdown" style="display:none">
+        <div class="score-breakdown-title">Wie kamen deine Punkte zustande?</div>
+        <div class="score-bd-row">
+          <span class="bd-label">📏 Distanz</span>
+          <span class="bd-val" id="bd-score-dist">0 Pkt</span>
+        </div>
+        <div class="score-bd-row" id="bds-capital-row">
+          <span class="bd-label">🏛 Hauptstädte</span>
+          <span class="bd-val" id="bd-score-capital">0 Pkt</span>
+        </div>
+        <div class="score-bd-row" id="bds-newcountry-row">
+          <span class="bd-label">🌍 Neue Länder</span>
+          <span class="bd-val" id="bd-score-newcountry">0 Pkt</span>
+        </div>
+        <div class="score-bd-row" id="bds-photo-row">
+          <span class="bd-label">📷 Fotos</span>
+          <span class="bd-val" id="bd-score-photo">0 Pkt</span>
+        </div>
+        <div class="score-bd-row bd-total">
+          <span class="bd-label">Gesamt</span>
+          <span class="bd-val" id="bd-score-total">0 Pkt</span>
+        </div>
+      </div>
+
       <!-- Name-Eingabe (initial oder edit) -->
       <div id="name-setup" class="name-setup-card">
         <div style="font-size:28px;margin-bottom:8px">👤</div>
@@ -1021,6 +1103,21 @@
           <li>Domain: 32-er.com</li>
           <li>Kosten: 0 €/Monat</li>
         </ul>
+      </div>
+
+      <!-- Admin-Bereich -->
+      <div class="info-section" id="admin-section">
+        <h3>🔐 Admin</h3>
+        <div id="admin-login-form">
+          <input type="email" id="admin-email" class="admin-input" placeholder="Admin E-Mail" autocomplete="email">
+          <input type="password" id="admin-password" class="admin-input" placeholder="Passwort">
+          <button onclick="adminLogin()" class="btn-primary" style="padding:12px">Anmelden</button>
+        </div>
+        <div id="admin-logged-in" style="display:none">
+          <div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:8px">✅ Admin-Modus aktiv</div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Lösch-Buttons sind in der Sticker-Liste sichtbar.</p>
+          <button onclick="adminLogout()" style="background:none;border:1px solid var(--border);border-radius:10px;padding:10px 16px;color:var(--text2);cursor:pointer;font-size:14px;width:100%">Abmelden</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1807,6 +1904,7 @@ function renderStickerList() {
         </div>
         <div class="sticker-pts">${pts}<small>Pkt</small></div>
       </div>
+      ${isAdmin && s.id ? `<div class="sticker-card-admin"><button class="admin-delete-btn" onclick="deleteSticker(${s.id}, event)">🗑 Löschen</button></div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1868,9 +1966,68 @@ function saveUsername() {
   myUsername = val.slice(0, 20);
   localStorage.setItem('32er_username', myUsername);
   document.getElementById('name-setup').classList.remove('show');
+
+  // Existierende Sticker dieser Session mit neuem Namen verknüpfen
+  if (useSupabase && mySessionId) {
+    db.from('stickers').update({ username: myUsername }).eq('session_id', mySessionId)
+      .then(({ error }) => { if (error) console.warn('Username-Sync:', error); });
+  }
+
   updateScore();
   loadLeaderboard();
   toast('✅ Name gespeichert!', 'success');
+}
+
+// ═══════════════════════════════════════════════
+//  ADMIN
+// ═══════════════════════════════════════════════
+let isAdmin = false;
+
+async function adminLogin() {
+  if (!useSupabase) { toast('Supabase nicht verbunden', 'error'); return; }
+  const email    = document.getElementById('admin-email').value.trim();
+  const password = document.getElementById('admin-password').value;
+  if (!email || !password) { toast('E-Mail und Passwort eingeben', 'error'); return; }
+  try {
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    isAdmin = true;
+    document.getElementById('admin-login-form').style.display = 'none';
+    document.getElementById('admin-logged-in').style.display  = 'block';
+    renderStickerList();
+    toast('✅ Admin-Modus aktiv', 'success');
+  } catch(e) {
+    toast('Anmeldung fehlgeschlagen – Passwort falsch?', 'error');
+  }
+}
+
+async function adminLogout() {
+  await db.auth?.signOut();
+  isAdmin = false;
+  document.getElementById('admin-login-form').style.display = 'block';
+  document.getElementById('admin-logged-in').style.display  = 'none';
+  renderStickerList();
+  toast('Abgemeldet', '');
+}
+
+async function deleteSticker(id, event) {
+  event.stopPropagation();
+  if (!isAdmin) return;
+  if (!confirm('Diesen Sticker wirklich löschen?')) return;
+  try {
+    if (useSupabase) {
+      const { error } = await db.from('stickers').delete().eq('id', id);
+      if (error) throw error;
+    }
+    stickers = stickers.filter(s => s.id !== id);
+    saveLocal(stickers);
+    renderMarkers();
+    renderStickerList();
+    toast('🗑 Sticker gelöscht', 'success');
+  } catch(e) {
+    console.error(e);
+    toast('Fehler beim Löschen', 'error');
+  }
 }
 
 // Enter-Taste im Username-Input
@@ -2014,6 +2171,28 @@ function updateMyScoreCard(me, rank, total) {
   document.getElementById('my-country-count').textContent = countryCount;
   document.getElementById('my-continent-count').textContent = continentCount;
   document.getElementById('my-photo-count').textContent = photoCount;
+
+  // Punkte-Aufschlüsselung
+  const bd = { dist: 0, capital: 0, newCountry: 0, photo: 0 };
+  myStickers.forEach(s => {
+    const b = s.pts_breakdown || s.breakdown || {};
+    bd.dist     += b.dist      || 0;
+    bd.capital  += b.capital   || 0;
+    bd.newCountry += b.newCountry || 0;
+    bd.photo    += b.photo     || 0;
+  });
+  const bsEl = document.getElementById('score-breakdown');
+  if (bsEl && stickerCount > 0) {
+    bsEl.style.display = '';
+    document.getElementById('bd-score-dist').textContent       = `+${bd.dist} Pkt`;
+    document.getElementById('bds-capital-row').style.display   = bd.capital   ? '' : 'none';
+    document.getElementById('bd-score-capital').textContent    = `+${bd.capital} Pkt`;
+    document.getElementById('bds-newcountry-row').style.display = bd.newCountry ? '' : 'none';
+    document.getElementById('bd-score-newcountry').textContent = `+${bd.newCountry} Pkt`;
+    document.getElementById('bds-photo-row').style.display     = bd.photo     ? '' : 'none';
+    document.getElementById('bd-score-photo').textContent      = `+${bd.photo} Pkt`;
+    document.getElementById('bd-score-total').textContent      = `${totalPts} Pkt`;
+  } else if (bsEl) { bsEl.style.display = 'none'; }
 
   // Header
   document.getElementById('score-header-sub').textContent = rank ? `Du bist auf Platz ${rank}` : 'Globale Rangliste';
