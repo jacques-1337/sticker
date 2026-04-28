@@ -97,10 +97,12 @@ function renderChallenges() {
 function openChallengeModal(friendId, friendUsername) {
   if (!currentUser) { toast('🔒 Bitte einloggen', 'error'); return; }
 
-  // Live-Score aus Stickern berechnen (nicht aus users.points → kann veraltet sein)
-  const liveScore = stickers
+  // Gesamtscore = Sticker-Punkte + Challenge-Bonus/Malus
+  const stickerScore   = stickers
     .filter(s => s.owner_id === currentUser.id)
     .reduce((sum, s) => sum + (s.points || 0), 0);
+  const challengeBonus = currentUser.points || 0;
+  const liveScore      = Math.max(0, stickerScore + challengeBonus);
 
   pendingChallengeTarget = { id: friendId, username: friendUsername, liveScore };
   $id('ch-create-friend-name').textContent = friendUsername;
@@ -220,12 +222,23 @@ async function finishChallenge(challengeId, winnerId) {
       p_winner_id:    winnerId
     });
     if (error) throw error;
+    // currentUser.points nach Challenge aus DB neu laden
+    await refreshUserPoints();
     return data;
   } catch (e) {
     logInternal('ch/finish', e);
     toast('Konnte Spiel nicht abschließen', 'error');
     return null;
   }
+}
+
+// Lädt users.points frisch aus der DB und aktualisiert currentUser
+async function refreshUserPoints() {
+  if (!currentUser || !useSupabase) return;
+  try {
+    const { data } = await db.from('users').select('points').eq('id', currentUser.id).single();
+    if (data) currentUser.points = data.points || 0;
+  } catch(e) { /* ignorieren */ }
 }
 
 async function transferPoints(winnerId, loserId, amount) {

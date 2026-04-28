@@ -44,14 +44,20 @@ function updateMyScoreCard(me, rank, total) {
     if (!currentUser && myUserId && s.user_id === myUserId) return true;
     return false;
   });
-  const src           = me || null;
-  const totalPts      = src ? src.pts      : myStickers.reduce((sum,s)=>sum+(s.points||s.pts||0),0);
-  const stickerCount  = src ? src.stickers : myStickers.length;
-  const countryCount  = src ? src.countries: new Set(myStickers.map(s=>s.country_code||s.countryCode||s.cc)).size;
-  const continentCount= src ? src.continents: new Set(myStickers.map(s=>s.continent)).size;
-  const photoCount    = src ? src.photos   : myStickers.filter(s=>s.photo_url||s.photoData).length;
+  const src            = me || null;
+  const stickerPts     = src ? src.stickerPts : myStickers.reduce((sum,s)=>sum+(s.points||s.pts||0),0);
+  const challengeBonus = src ? (src.challengeBonus||0) : (currentUser?.points || 0);
+  const totalPts       = stickerPts + challengeBonus;
+  const stickerCount   = src ? src.stickers  : myStickers.length;
+  const countryCount   = src ? src.countries : new Set(myStickers.map(s=>s.country_code||s.countryCode||s.cc)).size;
+  const continentCount = src ? src.continents: new Set(myStickers.map(s=>s.continent)).size;
+  const photoCount     = src ? src.photos    : myStickers.filter(s=>s.photo_url||s.photoData).length;
 
-  document.getElementById('my-pts-big').innerHTML       = `${totalPts} <small>Pkt</small>`;
+  // Punkte-Anzeige: Basis + Challenge-Bonus/Malus separat
+  const bonusStr = challengeBonus !== 0
+    ? ` <small style="font-size:12px;color:${challengeBonus>0?'var(--green)':'var(--red)'}">${challengeBonus>0?'+':''}${challengeBonus} CH</small>`
+    : '';
+  document.getElementById('my-pts-big').innerHTML = `${totalPts}${bonusStr} <small>Pkt</small>`;
   document.getElementById('my-sticker-count').textContent  = stickerCount;
   document.getElementById('my-country-count').textContent  = countryCount;
   document.getElementById('my-continent-count').textContent= continentCount;
@@ -101,14 +107,19 @@ async function loadLeaderboard() {
     const timeout = (ms) => new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')),ms));
     const [stickersRes, usersRes] = await Promise.all([
       Promise.race([db.from('stickers').select('owner_id, session_id, username, points, country_code, continent, photo_url'), timeout(7000)]),
-      Promise.race([db.from('users').select('id, username'), timeout(7000)])
+      // points = Challenge-Bonus/Malus (kann negativ sein)
+      Promise.race([db.from('users').select('id, username, points'), timeout(7000)])
     ]);
     if (stickersRes.error) throw stickersRes.error;
     const allStickers = stickersRes.data || [];
     const users       = usersRes.data   || [];
 
-    const userNameMap = {};
-    users.forEach(u => { userNameMap[u.id] = u.username; });
+    const userNameMap    = {};
+    const userBonusMap   = {}; // id → challenge bonus/malus
+    users.forEach(u => {
+      userNameMap[u.id]  = u.username;
+      userBonusMap[u.id] = u.points || 0;
+    });
 
     const playerMap = {};
     allStickers.forEach(s => {
@@ -119,16 +130,23 @@ async function loadLeaderboard() {
           name: userNameMap[s.owner_id] || s.username || null,
           ownerId: s.owner_id || null, sid: s.session_id || null,
           isRegistered: !!s.owner_id,
-          pts:0, stickers:0, countries:new Set(), continents:new Set(), photos:0
+          stickerPts:0, pts:0, challengeBonus:0,
+          stickers:0, countries:new Set(), continents:new Set(), photos:0
         };
       }
       if (s.owner_id && userNameMap[s.owner_id]) playerMap[key].name = userNameMap[s.owner_id];
       else if (s.username && !playerMap[key].name) playerMap[key].name = s.username;
-      playerMap[key].pts += s.points || 0;
+      playerMap[key].stickerPts += s.points || 0;
       playerMap[key].stickers++;
       if (s.country_code) playerMap[key].countries.add(s.country_code);
       if (s.continent)    playerMap[key].continents.add(s.continent);
       if (s.photo_url)    playerMap[key].photos++;
+    });
+
+    // Challenge-Bonus/Malus pro Spieler addieren
+    Object.values(playerMap).forEach(p => {
+      p.challengeBonus = p.ownerId ? (userBonusMap[p.ownerId] || 0) : 0;
+      p.pts            = p.stickerPts + p.challengeBonus;
     });
 
     const allPlayers    = Object.values(playerMap)
