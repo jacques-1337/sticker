@@ -238,11 +238,33 @@ document.getElementById('pin-city-input').addEventListener('blur', function() {
 function doPinSearch(q) {
   const sug = document.getElementById('pin-suggestions');
   if (q.length < 2) { sug.classList.remove('open'); return; }
-  const ql = q.toLowerCase();
-  const results = CITIES.filter(c =>
-    c.n.toLowerCase().startsWith(ql) || c.n.toLowerCase().includes(ql) || c.c.toLowerCase().includes(ql)
-  ).slice(0, 8);
-  if (!results.length) { sug.classList.remove('open'); return; }
+  const ql = q.toLowerCase()
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+
+  const results = CITIES.filter(c => {
+    const cn = c.n.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+    const cc = c.c.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+    // Priorität: starts-with schlägt contains
+    return cn.startsWith(ql) || c.n.toLowerCase().startsWith(ql) ||
+           cn.includes(ql)   || c.n.toLowerCase().includes(ql)   ||
+           cc.includes(ql)   || c.c.toLowerCase().includes(ql);
+  })
+  // Sortierung: starts-with zuerst, dann alphabetisch
+  .sort((a, b) => {
+    const an = a.n.toLowerCase(), bn = b.n.toLowerCase();
+    const aStart = an.startsWith(ql) ? 0 : 1;
+    const bStart = bn.startsWith(ql) ? 0 : 1;
+    if (aStart !== bStart) return aStart - bStart;
+    return an.localeCompare(bn, 'de');
+  })
+  .slice(0, 10);
+  if (!results.length) {
+    // Kein lokaler Treffer → Nominatim-Suche als Fallback
+    sug.innerHTML = '<div class="suggestion-item" style="color:var(--text2);font-size:12px">🔍 Suche online…</div>';
+    sug.classList.add('open');
+    searchNominatim(q);
+    return;
+  }
   sug.innerHTML = results.map(c => {
     const km = Math.round(haversine(HOME_LAT, HOME_LNG, c.lat, c.lng));
     return `<div class="suggestion-item" onclick="selectPinCity(${CITIES.indexOf(c)})">
@@ -255,6 +277,68 @@ function doPinSearch(q) {
     </div>`;
   }).join('');
   sug.classList.add('open');
+}
+
+// Nominatim-Freitext-Suche für Orte außerhalb der lokalen DB
+let nominatimSearchTimer = null;
+function searchNominatim(q) {
+  clearTimeout(nominatimSearchTimer);
+  nominatimSearchTimer = setTimeout(async () => {
+    const sug = document.getElementById('pin-suggestions');
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=8&accept-language=de`;
+      const res  = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data.length) {
+        sug.innerHTML = '<div class="suggestion-item" style="color:var(--text2);font-size:12px">Kein Ort gefunden</div>';
+        return;
+      }
+      sug.innerHTML = data.map((r, i) => {
+        const lat  = parseFloat(r.lat);
+        const lng  = parseFloat(r.lon);
+        const km   = Math.round(haversine(HOME_LAT, HOME_LNG, lat, lng));
+        const name = r.name || r.display_name.split(',')[0];
+        const sub  = r.display_name.split(',').slice(1,3).join(',').trim();
+        const cc   = (r.address?.country_code || '').toUpperCase();
+        const flag = cc ? ccToFlag(cc) : '📍';
+        return `<div class="suggestion-item" onclick="selectNominatimResult(${i})" data-nom-idx="${i}">
+          <span class="flag">${flag}</span>
+          <span style="flex:1;padding:0 8px">
+            <strong>${escHtml(name)}</strong>
+            <span style="color:var(--text2);font-size:12px;display:block">${escHtml(sub)}</span>
+          </span>
+          <span class="pop">${km > 1000 ? Math.round(km/100)/10+'k' : km} km</span>
+        </div>`;
+      }).join('');
+      // Ergebnisse für Auswahl cachen
+      window._nominatimResults = data;
+    } catch(e) {
+      sug.innerHTML = '<div class="suggestion-item" style="color:var(--text2);font-size:12px">⚠️ Online-Suche fehlgeschlagen</div>';
+    }
+  }, 400);
+}
+
+async function selectNominatimResult(idx) {
+  const r    = window._nominatimResults?.[idx];
+  if (!r) return;
+  const lat  = parseFloat(r.lat);
+  const lng  = parseFloat(r.lon);
+  const name = r.name || r.display_name.split(',')[0];
+  const cc   = (r.address?.country_code || '').toUpperCase();
+
+  document.getElementById('pin-city-input').value = name;
+  document.getElementById('pin-suggestions').classList.remove('open');
+
+  // Reverse-Geocode für vollständige Metadaten
+  let loc = await reverseGeocode(lat, lng);
+  if (!loc) loc = buildFallbackLocation(lat, lng);
+  loc.n   = name;
+  loc.lat = lat;
+  loc.lng = lng;
+
+  if (pinMap) pinMap.setView([lat, lng], 13, { animate: true });
+  updatePinLocationBarLoose(loc);
 }
 
 function selectPinCity(idx) {
