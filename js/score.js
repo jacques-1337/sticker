@@ -18,52 +18,67 @@ function switchScoreTab(tab) {
   if (tab === 'friends')   loadFriendsLeaderboard();
 }
 
-function loadFriendsLeaderboard() {
+async function loadFriendsLeaderboard() {
   const listEl = $id('friends-leaderboard-list');
   if (!listEl) return;
 
   if (!currentUser) {
-    listEl.innerHTML = `
-      <div class="empty-state">
-        <span class="es-icon">🔒</span>
-        <h3>Login erforderlich</h3>
-        <p>Melde dich an, um deine Freunde hier zu sehen.</p>
-      </div>`;
+    listEl.innerHTML = `<div class="empty-state"><span class="es-icon">🔒</span><h3>Login erforderlich</h3><p>Melde dich an, um Freunde zu sehen.</p></div>`;
+    return;
+  }
+  if (!useSupabase) {
+    listEl.innerHTML = `<div class="empty-state"><span class="es-icon">📶</span><h3>Keine Verbindung</h3><p>Datenbankverbindung fehlt.</p></div>`;
     return;
   }
 
-  const cache = typeof friendsCache !== 'undefined' ? friendsCache : [];
-  const myPts = (currentUser.points || 0) +
-    stickers.filter(s => s.owner_id === currentUser.id).reduce((s,x) => s + (x.points||x.pts||0), 0);
+  listEl.innerHTML = '<div class="lb-loading">Lade Freunde…</div>';
 
-  const entries = [
-    { id: currentUser.id, username: currentUser.username, pts: myPts, isSelf: true },
-    ...cache.map(f => ({ ...f, isSelf: false }))
-  ].sort((a, b) => b.pts - a.pts);
+  try {
+    const { data: fRows, error: fErr } = await db.from('friends')
+      .select('friend_id').eq('user_id', currentUser.id);
+    if (fErr) throw fErr;
 
-  if (cache.length === 0) {
-    listEl.innerHTML = `
-      <div class="empty-state">
-        <span class="es-icon">👥</span>
-        <h3>Noch keine Freunde</h3>
-        <p>Füge Freunde im Social-Tab hinzu, um hier ein Ranking zu sehen.</p>
-      </div>`;
-    return;
-  }
+    const friendIds = (fRows || []).map(r => r.friend_id);
+    if (!friendIds.length) {
+      listEl.innerHTML = `<div class="empty-state"><span class="es-icon">👥</span><h3>Noch keine Freunde</h3><p>Füge Freunde im Social-Tab hinzu.</p></div>`;
+      return;
+    }
 
-  listEl.innerHTML = entries.map((e, i) => {
-    const rank = i + 1;
-    const rankLabel = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-    const rankClass = rank <= 3 ? `top${rank}` : '';
-    const meClass   = e.isSelf ? 'is-me' : '';
-    const tag       = e.isSelf ? ' <small style="font-size:10px;color:var(--text2)">(du)</small>' : '';
-    return `
-      <div class="lb-row ${meClass}">
+    const allIds = [...friendIds, currentUser.id];
+    const [usersRes, stickersRes] = await Promise.all([
+      db.from('users').select('id, username, points').in('id', allIds),
+      db.from('stickers').select('owner_id, points').in('owner_id', allIds)
+    ]);
+
+    const stickerPtsMap = {};
+    (stickersRes.data || []).forEach(s => {
+      stickerPtsMap[s.owner_id] = (stickerPtsMap[s.owner_id] || 0) + (s.points || 0);
+    });
+
+    const entries = (usersRes.data || []).map(u => ({
+      id:       u.id,
+      username: u.username,
+      pts:      (stickerPtsMap[u.id] || 0) + (u.points || 0),
+      isSelf:   u.id === currentUser.id
+    })).sort((a, b) => b.pts - a.pts);
+
+    listEl.innerHTML = entries.map((e, i) => {
+      const rank      = i + 1;
+      const rankLabel = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+      const rankClass = rank <= 3 ? `top${rank}` : '';
+      const meClass   = e.isSelf ? 'is-me' : '';
+      const tag       = e.isSelf ? ' <span style="font-size:10px;color:var(--accent)">(du)</span>' : '';
+      return `<div class="lb-row ${meClass}">
         <div class="lb-rank ${rankClass}">${rankLabel}</div>
         <div class="lb-name">${escHtml(e.username)}${tag}</div>
         <div class="lb-pts">${e.pts} <small>Pkt</small></div>
       </div>`;
-  }).join('');
+    }).join('');
+
+  } catch(e) {
+    logInternal('score/friends', e);
+    listEl.innerHTML = `<div class="empty-state"><span class="es-icon">⚠️</span><h3>Ladefehler</h3><p>${escHtml(e.message||'Unbekannter Fehler')}</p></div>`;
+  }
 }
 
 // ── Score-Karte ───────────────────────────────────────────────

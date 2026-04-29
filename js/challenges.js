@@ -222,13 +222,32 @@ async function finishChallenge(challengeId, winnerId) {
       p_winner_id:    winnerId
     });
     if (error) throw error;
-    // currentUser.points nach Challenge aus DB neu laden
     await refreshUserPoints();
     return data;
-  } catch (e) {
-    logInternal('ch/finish', e);
-    toast('Konnte Spiel nicht abschließen', 'error');
-    return null;
+  } catch (rpcErr) {
+    logInternal('ch/finish/rpc', rpcErr);
+    // Fallback: manueller Punkte-Transfer wenn RPC nicht verfügbar
+    try {
+      const { data: ch } = await db.from('challenges')
+        .select('challenger_id, opponent_id, points_stake')
+        .eq('id', challengeId).single();
+      if (ch && winnerId) {
+        const loserId = winnerId === ch.challenger_id ? ch.opponent_id : ch.challenger_id;
+        await transferPoints(winnerId, loserId, ch.points_stake);
+      }
+      await db.from('challenges').update({
+        status:       'finished',
+        winner_id:    winnerId,
+        completed_at: new Date().toISOString(),
+        updated_at:   new Date().toISOString()
+      }).eq('id', challengeId);
+      await refreshUserPoints();
+      return { success: true, winner_id: winnerId, fallback: true };
+    } catch (fbErr) {
+      logInternal('ch/finish/fallback', fbErr);
+      toast('Konnte Spiel nicht abschließen', 'error');
+      return null;
+    }
   }
 }
 
@@ -375,6 +394,72 @@ async function onChallengeChange(payload) {
       if (won)             toast(`🏆 +${row.points_stake} Pkt!`, 'success');
       else if (row.winner_id) toast(`💔 -${row.points_stake} Pkt`, 'error');
       else                 toast('🤝 Unentschieden', 'info');
+      loadDuelHistory();
+      refreshUserPoints().then(() => updateMyScoreCard(null, null, 0));
     }
+  }
+}
+
+// ── Duell-Historie ────────────────────────────────────────────
+const GAME_LABELS = {
+  connect4:   '🔴 4 gewinnt',
+  battleship: '🚢 Schiffe versenken',
+  flappy:     '🐤 Flappy Bird',
+  tetris:     '🧱 Tetris',
+  racing:     '🏎 Racing',
+};
+
+async function loadDuelHistory() {
+  const listEl = $id('duel-history-list');
+  if (!listEl || !currentUser || !useSupabase) return;
+
+  listEl.innerHTML = '<div class="lb-loading">Lade Duelle…</div>';
+
+  try {
+    const { data, error } = await db.from('challenges')
+      .select('id, challenger_id, opponent_id, game_type, points_stake, winner_id, completed_at')
+      .or(`challenger_id.eq.${currentUser.id},opponent_id.eq.${currentUser.id}`)
+      .eq('status', 'finished')
+      .order('completed_at', { ascending: false })
+      .limit(30);
+    if (error) throw error;
+
+    if (!data || !data.length) {
+      listEl.innerHTML = `<div class="muted-empty">Noch keine abgeschlossenen Duelle.<br><span style="font-size:11px">Fordere Freunde heraus im Social-Tab!</span></div>`;
+      return;
+    }
+
+    const otherIds = [...new Set(data.map(c =>
+      c.challenger_id === currentUser.id ? c.opponent_id : c.challenger_id
+    ))];
+    const { data: users } = await db.from('users').select('id, username').in('id', otherIds);
+    const nameMap = {};
+    (users || []).forEach(u => { nameMap[u.id] = u.username; });
+
+    listEl.innerHTML = data.map(c => {
+      const otherId   = c.challenger_id === currentUser.id ? c.opponent_id : c.challenger_id;
+      const opponent  = escHtml(nameMap[otherId] || '?');
+      const tie       = !c.winner_id;
+      const won       = c.winner_id === currentUser.id;
+      const icon      = tie ? '🤝' : won ? '🏆' : '💔';
+      const pts       = tie ? '±0' : won ? `+${c.points_stake}` : `-${c.points_stake}`;
+      const ptsColor  = tie ? 'var(--text2)' : won ? 'var(--green)' : 'var(--red)';
+      const game      = GAME_LABELS[c.game_type] || c.game_type;
+      const date      = c.completed_at
+        ? new Date(c.completed_at).toLocaleDateString('de', { day:'2-digit', month:'2-digit' })
+        : '–';
+      return `<div class="duel-item">
+        <div class="duel-icon">${icon}</div>
+        <div class="duel-info">
+          <div class="duel-opponent">vs. ${opponent}</div>
+          <div class="duel-meta">${game} · ${date}</div>
+        </div>
+        <div class="duel-pts" style="color:${ptsColor}">${pts} Pkt</div>
+      </div>`;
+    }).join('');
+
+  } catch(e) {
+    logInternal('duel/history', e);
+    listEl.innerHTML = `<div class="muted-empty">Fehler beim Laden.</div>`;
   }
 }

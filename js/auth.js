@@ -256,26 +256,31 @@ function updateAccountInfoBox() {
   const box = document.getElementById('account-info-box');
   const sec = document.getElementById('account-section');
   const cta = document.getElementById('login-cta-section');
+  const hdr = document.getElementById('info-header-sub');
   if (!currentUser) {
-    sec.style.display = 'none';
+    if (sec) sec.style.display = 'none';
     if (cta) cta.style.display = '';
+    if (hdr) hdr.textContent = 'Account & Spielinfo';
     return;
   }
-  sec.style.display = '';
+  if (sec) sec.style.display = '';
   if (cta) cta.style.display = 'none';
+  if (hdr) hdr.textContent = `@${currentUser.username}`;
 
   const myStickers  = stickers.filter(s => s.owner_id === currentUser.id);
-  const myPts       = myStickers.reduce((sum, s) => sum + (s.points || 0), 0);
+  const myPts       = myStickers.reduce((sum, s) => sum + (s.points || 0), 0) + (currentUser.points || 0);
   const myCountries = new Set(myStickers.map(s => s.country_code)).size;
 
-  box.innerHTML = `
+  if (box) box.innerHTML = `
     <div class="acc-row"><span class="acc-label">Username</span><span class="acc-val">${escHtml(currentUser.username)}</span></div>
     <div class="acc-row"><span class="acc-label">Sticker</span><span class="acc-val">${myStickers.length}</span></div>
     <div class="acc-row"><span class="acc-label">Länder</span><span class="acc-val">${myCountries}</span></div>
     <div class="acc-row"><span class="acc-label">Punkte</span><span class="acc-val">${myPts}</span></div>
-    <div class="acc-row"><span class="acc-label">Account seit</span><span class="acc-val">${currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('de') : '–'}</span></div>
+    <div class="acc-row"><span class="acc-label">Dabei seit</span><span class="acc-val">${currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('de') : '–'}</span></div>
   `;
 
+  if (typeof renderProfileSection === 'function') renderProfileSection();
+  if (typeof loadDuelHistory      === 'function') loadDuelHistory();
   renderAccountBadges(myStickers, myPts);
   renderAccountHistory(myStickers);
 }

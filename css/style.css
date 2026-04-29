@@ -1737,6 +1737,69 @@ body {
 }
 
 
+/* ── 29a. PROFILE AVATAR + BIO ───────────────────────────── */
+.profile-avatar-wrap {
+  display: flex; align-items: center; gap: 16px;
+  padding: 4px 0 16px;
+}
+.profile-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; overflow: hidden; position: relative;
+}
+.profile-avatar img {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 50%; display: block;
+}
+.profile-avatar-fallback {
+  font-size: 28px; font-weight: 800; color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+}
+.profile-avatar-actions { display: flex; flex-direction: column; gap: 6px; }
+.profile-avatar-btn {
+  display: inline-block;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 6px 12px;
+  font-size: var(--f-sm); font-weight: 700; color: var(--text);
+  cursor: pointer; font-family: inherit;
+  transition: border-color var(--t-fast);
+  text-align: center;
+}
+.profile-avatar-btn:active { transform: scale(0.96); }
+.profile-avatar-btn.ghost  { color: var(--text2); }
+
+.profile-bio-wrap   { display: flex; flex-direction: column; gap: 6px; }
+.profile-bio-label  { font-size: var(--f-sm); font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+.profile-bio-input  {
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 12px; color: var(--text); font-size: var(--f-base);
+  font-family: inherit; resize: none; height: 72px; outline: none;
+  transition: border-color var(--t-base);
+}
+.profile-bio-input:focus { border-color: var(--accent); }
+.profile-bio-actions {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.profile-bio-count  { font-size: var(--f-xs); color: var(--text3); }
+
+/* ── 29b. DUEL HISTORY ───────────────────────────────────── */
+.duel-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.duel-item:last-child { border-bottom: none; }
+.duel-icon     { font-size: 22px; flex-shrink: 0; width: 28px; text-align: center; }
+.duel-info     { flex: 1; min-width: 0; }
+.duel-opponent { font-size: var(--f-base); font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.duel-meta     { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.duel-pts      { font-size: var(--f-base); font-weight: 800; white-space: nowrap; flex-shrink: 0; }
+
+
 /* ── 29b. INFO TABLE (Punkte-System) ─────────────────────── */
 .info-table {
   background: var(--surface2);
