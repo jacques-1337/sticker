@@ -7,6 +7,9 @@
 
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!-- Leaflet MarkerCluster -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <!-- App Design System -->
 <link rel="stylesheet" href="css/style.css"/>
 
@@ -228,6 +231,17 @@
       </button>
     </div>
     <div id="map-filter-empty" class="map-filter-empty"></div>
+
+    <!-- Karten-Modus Toggle -->
+    <div id="map-mode-toggle">
+      <button class="map-mode-btn active" data-mode="profile" onclick="switchMapMode('profile')" title="Profil-Karte">
+        <span class="map-mode-icon">👤</span><span class="map-mode-label">Profil</span>
+      </button>
+      <button class="map-mode-btn" data-mode="cluster" onclick="switchMapMode('cluster')" title="Cluster-Karte">
+        <span class="map-mode-icon">🔵</span><span class="map-mode-label">Cluster</span>
+      </button>
+    </div>
+
     <div id="map"></div>
   </div>
 
@@ -766,6 +780,7 @@
 
 <!-- Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script src="js/config.js"></script>

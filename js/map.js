@@ -6,6 +6,7 @@
 let map = null;
 let markersLayer = null;
 let currentMapFilter = 'all';
+let mapMode = 'profile'; // 'profile' | 'cluster'
 let userAvatarCache = {}; // userId → avatarUrl
 
 // ── Karte initialisieren ─────────────────────────────────────
@@ -18,6 +19,15 @@ function initMap() {
     maxZoom: 19, attribution: '© OpenStreetMap'
   }).addTo(map);
   markersLayer = L.layerGroup().addTo(map);
+}
+
+// ── Karten-Modus umschalten ──────────────────────────────────
+function switchMapMode(mode) {
+  mapMode = mode;
+  document.querySelectorAll('.map-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  renderMarkers();
 }
 
 // ── Filter ───────────────────────────────────────────────────
@@ -110,8 +120,34 @@ async function loadUserAvatars() {
 
 // ── Marker rendern ───────────────────────────────────────────
 function renderMarkers() {
-  if (!markersLayer) return;
-  markersLayer.clearLayers();
+  if (!map) return;
+
+  // Alten Layer entfernen und neuen passend zum Modus erstellen
+  if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+
+  const useCluster = mapMode === 'cluster' && typeof L.markerClusterGroup === 'function';
+
+  if (useCluster) {
+    markersLayer = L.markerClusterGroup({
+      maxClusterRadius: 70,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      animate: true,
+      iconCreateFunction(cluster) {
+        const n    = cluster.getChildCount();
+        const size = n > 99 ? 54 : n > 9 ? 44 : 36;
+        return L.divIcon({
+          html:     `<div class="map-cluster" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.34)}px">${n}</div>`,
+          className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
+        });
+      }
+    });
+  } else {
+    markersLayer = L.layerGroup();
+  }
+  markersLayer.addTo(map);
+
   const visible = filterStickersForMap();
 
   visible.forEach(s => {
@@ -119,48 +155,67 @@ function renderMarkers() {
     const lng = s.lng || s.city_lng;
     if (!lat || !lng) return;
 
-    const pts  = s.points || s.pts || 0;
+    const pts = s.points || s.pts || 0;
+    const isOwn    = currentUser && s.owner_id === currentUser.id;
+    const isFriend = currentUser && !isOwn && friendsCache.some(f => f.id === s.owner_id);
 
-    let extraClass = '';
-    if (currentUser) {
-      if (s.owner_id === currentUser.id) extraClass = ' map-marker-own';
-      else if (friendsCache.some(f => f.id === s.owner_id)) extraClass = ' map-marker-friend';
+    let extraClass = isOwn ? ' map-marker-own' : isFriend ? ' map-marker-friend' : '';
+
+    let icon;
+    if (useCluster) {
+      // Cluster-Modus: einfache farbige Kreise mit Punktzahl
+      const size = pts >= 20 ? 34 : pts >= 10 ? 28 : 24;
+      const capitalBadge = s.is_capital ? '<span class="map-marker-capital">★</span>' : '';
+      icon = L.divIcon({
+        className: '',
+        html: `<div class="map-marker${extraClass}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${pts}${capitalBadge}</div>`,
+        iconSize: [size, size], iconAnchor: [size/2, size/2]
+      });
+    } else {
+      // Profil-Modus: Avatar wenn vorhanden
+      const avatarUrl = s.owner_id ? userAvatarCache[s.owner_id] : null;
+      const size = avatarUrl ? 38 : (pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22);
+      const capitalBadge = s.is_capital && !avatarUrl ? '<span class="map-marker-capital">★</span>' : '';
+      const inner = avatarUrl
+        ? `<img src="${avatarUrl}" class="map-marker-img" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><span class="map-marker-fallback" style="display:none">${pts}</span>`
+        : `${pts}${capitalBadge}`;
+      icon = L.divIcon({
+        className: '',
+        html: `<div class="map-marker${extraClass}${avatarUrl?' map-marker-has-avatar':''}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${inner}</div>`,
+        iconSize: [size, size], iconAnchor: [size/2, size/2]
+      });
     }
 
-    const avatarUrl = s.owner_id ? userAvatarCache[s.owner_id] : null;
-    const size = avatarUrl ? 38 : (pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22);
-    const inner = avatarUrl
-      ? `<img src="${avatarUrl}" class="map-marker-img" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
-        + `<span class="map-marker-fallback" style="display:none">${pts}</span>`
-      : String(pts);
-
-    const icon = L.divIcon({
-      className: '',
-      html: `<div class="map-marker${extraClass}${avatarUrl?' map-marker-has-avatar':''}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${inner}</div>`,
-      iconSize: [size, size], iconAnchor: [size/2, size/2]
-    });
-
+    // Popup-Inhalt (beide Modi)
     let ownerLabel = '';
-    if (currentUser && s.owner_id === currentUser.id) {
-      ownerLabel = `<div style="font-size:11px;color:#e8c84a;font-weight:700;margin-top:2px">👤 von dir</div>`;
+    if (isOwn) {
+      const avUrl = userAvatarCache[s.owner_id];
+      const avHtml = avUrl
+        ? `<img src="${avUrl}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px">`
+        : '';
+      ownerLabel = `<div style="font-size:11px;color:#e8c84a;font-weight:700;margin-top:2px">${avHtml}👤 von dir</div>`;
     } else if (s.owner_id) {
-      const friend = friendsCache.find(f => f.id === s.owner_id);
-      if (friend)       ownerLabel = `<div style="font-size:11px;color:#8aa9e8;font-weight:700;margin-top:2px">👥 ${escHtml(friend.username)}</div>`;
-      else if (s.username) ownerLabel = `<div style="font-size:11px;color:#8888aa;margin-top:2px">von ${escHtml(s.username)}</div>`;
+      const friend  = friendsCache.find(f => f.id === s.owner_id);
+      const avUrl   = userAvatarCache[s.owner_id];
+      const avHtml  = avUrl ? `<img src="${avUrl}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px">` : '';
+      if (friend)          ownerLabel = `<div style="font-size:11px;color:#8aa9e8;font-weight:700;margin-top:2px">${avHtml}👥 ${escHtml(friend.username)}</div>`;
+      else if (s.username) ownerLabel = `<div style="font-size:11px;color:#8888aa;margin-top:2px">${avHtml}von ${escHtml(s.username)}</div>`;
     } else if (s.username) {
       ownerLabel = `<div style="font-size:11px;color:#8888aa;margin-top:2px">von ${escHtml(s.username)}</div>`;
     }
+
+    const capitalNote = s.is_capital ? `<div style="font-size:11px;color:#e8c84a;margin-top:2px">🏛 Hauptstadt +3 Pkt</div>` : '';
 
     const marker = L.marker([lat, lng], { icon });
     marker.bindPopup(`
       <div style="min-width:160px">
         <div style="font-size:24px;margin-bottom:4px">${s.flag||'📍'}</div>
-        <div style="font-weight:700;font-size:15px;color:#f0f0f8">${s.city}</div>
-        <div style="font-size:12px;color:#8888aa;margin-bottom:8px">${s.country}</div>
+        <div style="font-weight:700;font-size:15px;color:#f0f0f8">${escHtml(s.city||'')}</div>
+        <div style="font-size:12px;color:#8888aa;margin-bottom:6px">${escHtml(s.country||'')}</div>
         ${s.photo_url ? `<img src="${s.photo_url}" style="width:100%;border-radius:8px;margin-bottom:8px;aspect-ratio:1/1;max-height:160px;object-fit:contain;object-position:center;background:#0a0a0a" onerror="this.style.display='none'">` : ''}
         <div style="font-size:20px;font-weight:800;color:#e8c84a">${pts} Punkte</div>
-        ${ownerLabel}
-        ${s.note ? `<div style="font-size:12px;color:#8888aa;margin-top:4px">${s.note}</div>` : ''}
+        ${capitalNote}${ownerLabel}
+        ${s.note ? `<div style="font-size:12px;color:#8888aa;margin-top:4px">${escHtml(s.note)}</div>` : ''}
       </div>
     `);
     markersLayer.addLayer(marker);
