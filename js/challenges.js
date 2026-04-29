@@ -265,7 +265,7 @@ async function transferPoints(winnerId, loserId, amount) {
   try {
     const { data: l } = await db.from('users').select('points').eq('id', loserId).single();
     const { data: w } = await db.from('users').select('points').eq('id', winnerId).single();
-    await db.from('users').update({ points: Math.max(0, (l?.points || 0) - amount) }).eq('id', loserId);
+    await db.from('users').update({ points: (l?.points || 0) - amount }).eq('id', loserId);
     await db.from('users').update({ points: (w?.points || 0) + amount }).eq('id', winnerId);
     return true;
   } catch (e) {

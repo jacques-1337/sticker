@@ -26,7 +26,13 @@ async function saveProfileField(field, value) {
     const { error } = await db.from('users')
       .update({ [field]: value })
       .eq('id', currentUser.id);
-    if (error) throw error;
+    if (error) {
+      const col = error.message?.includes('column') || error.message?.includes('does not exist');
+      if (col) {
+        toast('⚙️ SQL-Migration nötig — fix-challenge-grant.sql im Supabase-Dashboard ausführen', 'error');
+      }
+      throw error;
+    }
     if (field === 'avatar_url') currentUser.avatar_url = value;
     if (field === 'bio')        currentUser.bio        = value;
     return true;
