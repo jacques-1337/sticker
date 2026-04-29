@@ -56,6 +56,7 @@ async function renderSocialTab() {
   ensureMessageSubscription();
   ensureChallengeSubscription();
   renderVotingGallery();
+  if (typeof renderMgcSection === 'function') renderMgcSection();
 }
 
 function renderSocialIncoming() {
