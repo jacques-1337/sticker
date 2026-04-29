@@ -15,6 +15,55 @@ function switchScoreTab(tab) {
   });
   if (tab === 'countries') loadCountryScoreboard();
   if (tab === 'players')   loadLeaderboard();
+  if (tab === 'friends')   loadFriendsLeaderboard();
+}
+
+function loadFriendsLeaderboard() {
+  const listEl = $id('friends-leaderboard-list');
+  if (!listEl) return;
+
+  if (!currentUser) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <span class="es-icon">🔒</span>
+        <h3>Login erforderlich</h3>
+        <p>Melde dich an, um deine Freunde hier zu sehen.</p>
+      </div>`;
+    return;
+  }
+
+  const cache = typeof friendsCache !== 'undefined' ? friendsCache : [];
+  const myPts = (currentUser.points || 0) +
+    stickers.filter(s => s.owner_id === currentUser.id).reduce((s,x) => s + (x.points||x.pts||0), 0);
+
+  const entries = [
+    { id: currentUser.id, username: currentUser.username, pts: myPts, isSelf: true },
+    ...cache.map(f => ({ ...f, isSelf: false }))
+  ].sort((a, b) => b.pts - a.pts);
+
+  if (cache.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <span class="es-icon">👥</span>
+        <h3>Noch keine Freunde</h3>
+        <p>Füge Freunde im Social-Tab hinzu, um hier ein Ranking zu sehen.</p>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = entries.map((e, i) => {
+    const rank = i + 1;
+    const rankLabel = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    const rankClass = rank <= 3 ? `top${rank}` : '';
+    const meClass   = e.isSelf ? 'is-me' : '';
+    const tag       = e.isSelf ? ' <small style="font-size:10px;color:var(--text2)">(du)</small>' : '';
+    return `
+      <div class="lb-row ${meClass}">
+        <div class="lb-rank ${rankClass}">${rankLabel}</div>
+        <div class="lb-name">${escHtml(e.username)}${tag}</div>
+        <div class="lb-pts">${e.pts} <small>Pkt</small></div>
+      </div>`;
+  }).join('');
 }
 
 // ── Score-Karte ───────────────────────────────────────────────
