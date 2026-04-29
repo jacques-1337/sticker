@@ -6,6 +6,7 @@
 let map = null;
 let markersLayer = null;
 let currentMapFilter = 'all';
+let userAvatarCache = {}; // userId → avatarUrl
 
 // ── Karte initialisieren ─────────────────────────────────────
 function initMap() {
@@ -89,6 +90,24 @@ function updateMapStats(visible) {
   document.getElementById('stat-countries').textContent = countries;
 }
 
+// ── User-Avatare für Marker laden ────────────────────────────
+async function loadUserAvatars() {
+  if (!useSupabase || !stickers.length) return;
+  const ownerIds = [...new Set(stickers.filter(s => s.owner_id).map(s => s.owner_id))];
+  if (!ownerIds.length) return;
+  try {
+    const { data } = await db.from('users').select('id, avatar_url').in('id', ownerIds);
+    let changed = false;
+    (data || []).forEach(u => {
+      if (u.avatar_url && userAvatarCache[u.id] !== u.avatar_url) {
+        userAvatarCache[u.id] = u.avatar_url;
+        changed = true;
+      }
+    });
+    if (changed) renderMarkers();
+  } catch(e) { /* Avatare sind optional */ }
+}
+
 // ── Marker rendern ───────────────────────────────────────────
 function renderMarkers() {
   if (!markersLayer) return;
@@ -101,7 +120,6 @@ function renderMarkers() {
     if (!lat || !lng) return;
 
     const pts  = s.points || s.pts || 0;
-    const size = pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22;
 
     let extraClass = '';
     if (currentUser) {
@@ -109,9 +127,16 @@ function renderMarkers() {
       else if (friendsCache.some(f => f.id === s.owner_id)) extraClass = ' map-marker-friend';
     }
 
+    const avatarUrl = s.owner_id ? userAvatarCache[s.owner_id] : null;
+    const size = avatarUrl ? 38 : (pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22);
+    const inner = avatarUrl
+      ? `<img src="${avatarUrl}" class="map-marker-img" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+        + `<span class="map-marker-fallback" style="display:none">${pts}</span>`
+      : String(pts);
+
     const icon = L.divIcon({
       className: '',
-      html: `<div class="map-marker${extraClass}" style="width:${size}px;height:${size}px;font-size:${size*0.38}px">${pts}</div>`,
+      html: `<div class="map-marker${extraClass}${avatarUrl?' map-marker-has-avatar':''}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${inner}</div>`,
       iconSize: [size, size], iconAnchor: [size/2, size/2]
     });
 

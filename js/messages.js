@@ -16,13 +16,37 @@ function openChat(friendId, username) {
   activeChatFriend = { id: friendId, username };
   document.getElementById('chat-overlay').classList.add('open');
   document.getElementById('chat-username').textContent = username;
-  document.getElementById('chat-avatar').textContent   = (username[0]||'?').toUpperCase();
   document.getElementById('chat-status').textContent   = 'wird geladen…';
   document.getElementById('chat-messages').innerHTML   = '<div class="chat-empty">Lade Nachrichten…</div>';
   document.getElementById('chat-input').value = '';
   document.getElementById('chat-input').focus();
+  setChatAvatar(friendId, username);
   loadChatMessages(true);
   startChatPolling();
+}
+
+function setChatAvatar(friendId, username) {
+  const el = document.getElementById('chat-avatar');
+  if (!el) return;
+  const initial = (username[0] || '?').toUpperCase();
+  // Aus Cache laden falls vorhanden
+  const cached = typeof userAvatarCache !== 'undefined' ? userAvatarCache[friendId] : null;
+  if (cached) {
+    el.innerHTML = `<img src="${cached}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block" onerror="this.outerHTML='${initial}'">`;
+    return;
+  }
+  el.textContent = initial;
+  // Async aus DB laden
+  if (!useSupabase || !friendId) return;
+  db.from('users').select('avatar_url').eq('id', friendId).maybeSingle().then(({ data }) => {
+    if (data?.avatar_url) {
+      if (typeof userAvatarCache !== 'undefined') userAvatarCache[friendId] = data.avatar_url;
+      const cur = document.getElementById('chat-avatar');
+      if (cur && activeChatFriend?.id === friendId) {
+        cur.innerHTML = `<img src="${data.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block" onerror="this.outerHTML='${initial}'">`;
+      }
+    }
+  }).catch(() => {});
 }
 
 function closeChat() {

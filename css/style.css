@@ -1081,6 +1081,20 @@ body {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 2px 8px rgba(0,0,0,0.4);
 }
 .map-marker.map-marker-friend { background: var(--blue); color: #1a1a1a; }
+/* Avatar-Marker */
+.map-marker.map-marker-has-avatar {
+  background: var(--surface2); padding: 0; overflow: hidden;
+}
+.map-marker-img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  border-radius: 50%; display: block;
+}
+.map-marker-fallback {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  font-size: inherit; font-weight: 800; color: var(--bg);
+}
 
 /* Leaflet overrides */
 .leaflet-popup-content-wrapper {
@@ -1737,54 +1751,113 @@ body {
 }
 
 
-/* ── 29a. PROFILE AVATAR + BIO ───────────────────────────── */
-.profile-avatar-wrap {
-  display: flex; align-items: center; gap: 16px;
-  padding: 4px 0 16px;
+/* ── 29a. PROFILE CARD — Avatar + Bio ────────────────────── */
+.profile-card {
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-bottom: 4px;
 }
-.profile-avatar {
-  width: 72px; height: 72px; border-radius: 50%;
+
+/* Avatar row */
+.pf-avatar-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 0 16px;
+}
+.pf-avatar {
+  width: 76px; height: 76px; border-radius: 50%;
   background: var(--surface2);
   border: 2px solid var(--border);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; overflow: hidden; position: relative;
 }
-.profile-avatar img {
-  width: 100%; height: 100%; object-fit: cover;
-  border-radius: 50%; display: block;
+.pf-avatar-img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  display: block; border-radius: 50%;
 }
-.profile-avatar-fallback {
-  font-size: 28px; font-weight: 800; color: var(--accent);
+.pf-avatar-fallback {
+  font-size: 30px; font-weight: 800; color: var(--accent);
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 100%;
 }
-.profile-avatar-actions { display: flex; flex-direction: column; gap: 6px; }
-.profile-avatar-btn {
-  display: inline-block;
+.pf-avatar-info { display: flex; flex-direction: column; gap: 8px; }
+.pf-username    { font-size: var(--f-lg); font-weight: 800; color: var(--text); }
+.pf-upload-btn {
+  display: inline-flex; align-items: center; gap: 6px;
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 6px 12px;
+  border-radius: var(--r-sm); padding: 7px 14px;
   font-size: var(--f-sm); font-weight: 700; color: var(--text);
   cursor: pointer; font-family: inherit;
-  transition: border-color var(--t-fast);
-  text-align: center;
+  transition: border-color var(--t-fast), background var(--t-fast);
+  width: fit-content;
 }
-.profile-avatar-btn:active { transform: scale(0.96); }
-.profile-avatar-btn.ghost  { color: var(--text2); }
+.pf-upload-btn:hover { border-color: var(--accent); }
+.pf-upload-btn:active { transform: scale(0.96); }
+.pf-remove-btn {
+  background: none; border: none; color: var(--text2);
+  font-size: var(--f-sm); cursor: pointer; padding: 0;
+  text-decoration: underline; font-family: inherit;
+}
 
-.profile-bio-wrap   { display: flex; flex-direction: column; gap: 6px; }
-.profile-bio-label  { font-size: var(--f-sm); font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
-.profile-bio-input  {
+/* Preview */
+.pf-preview-wrap {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-md); overflow: hidden;
+  margin-bottom: 14px;
+}
+.pf-preview-img {
+  width: 100%; aspect-ratio: 1/1; max-height: 240px;
+  object-fit: contain; object-position: center;
+  display: block; background: #0a0a0a;
+}
+.pf-preview-actions {
+  display: flex; gap: 8px; padding: 10px 12px;
+  background: rgba(0,0,0,0.2); border-top: 1px solid var(--border);
+}
+.pf-save-avatar-btn {
+  flex: 1; background: var(--accent); color: var(--bg);
+  border: none; border-radius: var(--r-sm); padding: 9px 14px;
+  font-size: var(--f-base); font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: opacity var(--t-fast);
+}
+.pf-save-avatar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pf-cancel-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text2); border-radius: var(--r-sm); padding: 9px 14px;
+  font-size: var(--f-base); font-family: inherit; cursor: pointer;
+}
+
+/* Bio */
+.pf-bio-section { display: flex; flex-direction: column; gap: 8px; }
+.pf-label {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: var(--f-sm); font-weight: 600; color: var(--text2);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pf-bio-count  { font-size: var(--f-xs); color: var(--text3); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.pf-bio-input  {
   width: 100%; background: var(--surface2);
   border: 1px solid var(--border); border-radius: var(--r-sm);
   padding: 10px 12px; color: var(--text); font-size: var(--f-base);
   font-family: inherit; resize: none; height: 72px; outline: none;
   transition: border-color var(--t-base);
 }
-.profile-bio-input:focus { border-color: var(--accent); }
-.profile-bio-actions {
-  display: flex; justify-content: space-between; align-items: center;
+.pf-bio-input:focus { border-color: var(--accent); }
+.pf-save-bio-btn {
+  align-self: flex-end;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--r-sm); padding: 7px 16px;
+  font-size: var(--f-sm); font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: border-color var(--t-fast);
 }
-.profile-bio-count  { font-size: var(--f-xs); color: var(--text3); }
+.pf-save-bio-btn:hover  { border-color: var(--accent); }
+.pf-save-bio-btn:active { transform: scale(0.96); }
+
+/* Shared: user avatar img used in lists */
+.user-avatar-img {
+  border-radius: 50%; object-fit: cover;
+  flex-shrink: 0; display: block;
+}
 
 /* ── 29b. DUEL HISTORY ───────────────────────────────────── */
 .duel-item {

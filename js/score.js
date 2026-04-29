@@ -33,9 +33,14 @@ async function loadFriendsLeaderboard() {
 
   listEl.innerHTML = '<div class="lb-loading">Lade Freunde…</div>';
 
+  const tout = (ms) => new Promise((_, r) => setTimeout(() => r(new Error('Zeitüberschreitung')), ms));
+
   try {
-    const { data: fRows, error: fErr } = await db.from('friends')
-      .select('friend_id').eq('user_id', currentUser.id);
+    const fResult = await Promise.race([
+      db.from('friends').select('friend_id').eq('user_id', currentUser.id),
+      tout(8000)
+    ]);
+    const { data: fRows, error: fErr } = fResult;
     if (fErr) throw fErr;
 
     const friendIds = (fRows || []).map(r => r.friend_id);
@@ -45,9 +50,12 @@ async function loadFriendsLeaderboard() {
     }
 
     const allIds = [...friendIds, currentUser.id];
-    const [usersRes, stickersRes] = await Promise.all([
-      db.from('users').select('id, username, points').in('id', allIds),
-      db.from('stickers').select('owner_id, points').in('owner_id', allIds)
+    const [usersRes, stickersRes] = await Promise.race([
+      Promise.all([
+        db.from('users').select('id, username, points').in('id', allIds),
+        db.from('stickers').select('owner_id, points').in('owner_id', allIds)
+      ]),
+      tout(8000)
     ]);
 
     const stickerPtsMap = {};

@@ -27,6 +27,7 @@ async function init() {
 
   stickers = await loadStickers();
   renderMarkers();
+  loadUserAvatars(); // Avatare nachladen, Marker danach neu rendern
   updateScore();
   updateAccountInfoBox();
 
