@@ -1922,7 +1922,29 @@ body {
   flex-shrink: 0; display: block;
 }
 
-/* ── 29b. DUEL HISTORY ───────────────────────────────────── */
+/* ── 29b. ADMIN FEATURE TOGGLES ─────────────────────────── */
+.feature-toggle-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.feature-toggle-row:last-child { border-bottom: none; }
+.feature-toggle-info { flex: 1; }
+.feature-toggle-label { font-size: var(--f-base); font-weight: 600; color: var(--text); }
+.feature-toggle-desc  { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.feature-toggle-btn {
+  border: none; border-radius: var(--r-full);
+  padding: 6px 16px; font-size: var(--f-sm); font-weight: 800;
+  font-family: inherit; cursor: pointer;
+  min-width: 56px; text-align: center;
+  transition: all var(--t-fast);
+  flex-shrink: 0;
+}
+.feature-toggle-btn.on  { background: var(--green); color: var(--bg); }
+.feature-toggle-btn.off { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.feature-toggle-btn:active { transform: scale(0.94); }
+
+/* ── 29c. DUEL HISTORY ───────────────────────────────────── */
 .duel-item {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 4px;

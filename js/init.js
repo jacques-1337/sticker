@@ -25,9 +25,10 @@ async function init() {
 
   await restoreSession();
 
+  await loadFeatureFlags(); // Feature-Flags aus Supabase laden
   stickers = await loadStickers();
   renderMarkers();
-  loadUserAvatars(); // Avatare nachladen, Marker danach neu rendern
+  loadUserAvatars();
   updateScore();
   updateAccountInfoBox();
 

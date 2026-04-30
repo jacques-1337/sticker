@@ -135,10 +135,15 @@ function renderMarkers() {
       animate:             true,
       chunkedLoading:      true,
       iconCreateFunction(cluster) {
-        const n    = cluster.getChildCount();
-        const size = n > 99 ? 52 : n > 9 ? 44 : 36;
+        // Summe aller Punkte im Cluster anzeigen
+        const totalPts = cluster.getAllChildMarkers()
+          .reduce((sum, m) => sum + (m.options.pts || 0), 0);
+        const label = totalPts >= 1000
+          ? (totalPts / 1000).toFixed(1) + 'k'
+          : String(totalPts);
+        const size = totalPts > 500 ? 52 : totalPts > 100 ? 44 : 36;
         return L.divIcon({
-          html:      `<div class="map-cluster" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.34)}px">${n}</div>`,
+          html:      `<div class="map-cluster" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.3)}px">${label}</div>`,
           className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
         });
       }
@@ -195,7 +200,7 @@ function renderMarkers() {
     const capitalLine = s.is_capital
       ? `<div style="font-size:11px;color:#e8c84a;margin-top:2px">🏛 Hauptstadt</div>` : '';
 
-    const marker = L.marker([lat, lng], { icon });
+    const marker = L.marker([lat, lng], { icon, pts }); // pts für Cluster-Summe
     marker.bindPopup(`
       <div style="min-width:160px;max-width:220px">
         <div style="font-size:24px;margin-bottom:4px">${s.flag || '📍'}</div>

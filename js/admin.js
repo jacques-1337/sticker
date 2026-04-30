@@ -19,6 +19,8 @@ async function adminLogin() {
     renderStickerList();
     loadPinRequests();
     loadUserList();
+    renderAdminFeatureToggles();
+    applyFeatureFlags(); // Challenge/Game-Buttons für Admin sichtbar machen
     toast('✅ Admin-Modus aktiv', 'success');
   } catch(e) {
     toast('Anmeldung fehlgeschlagen – Passwort falsch?', 'error');
@@ -153,6 +155,39 @@ async function adminLogout() {
   document.getElementById('admin-logged-in').style.display  = 'none';
   renderStickerList();
   toast('Abgemeldet', '');
+}
+
+// ── Feature-Flag Toggles ──────────────────────
+function renderAdminFeatureToggles() {
+  const el = document.getElementById('admin-feature-toggles');
+  if (!el) return;
+
+  const flags = [
+    { key: 'challenges_active', label: '⚔️ Challenges', desc: 'Max. 1× täglich · Punkte aktiv' },
+    { key: 'games_active',      label: '🎮 Mini-Games',  desc: 'Max. 3× täglich · Punkte aktiv' },
+  ];
+
+  el.innerHTML = flags.map(f => {
+    const on = FEATURE_FLAGS[f.key];
+    return `
+      <div class="feature-toggle-row">
+        <div class="feature-toggle-info">
+          <div class="feature-toggle-label">${f.label}</div>
+          <div class="feature-toggle-desc">${f.desc}</div>
+        </div>
+        <button class="feature-toggle-btn ${on ? 'on' : 'off'}"
+                onclick="adminToggleFeature('${f.key}')">
+          ${on ? 'AN' : 'AUS'}
+        </button>
+      </div>`;
+  }).join('');
+}
+
+async function adminToggleFeature(key) {
+  const newVal = !FEATURE_FLAGS[key];
+  await setFeatureFlag(key, newVal);
+  renderAdminFeatureToggles();
+  toast(`${key}: ${newVal ? '✅ aktiviert' : '⛔ deaktiviert'}`, newVal ? 'success' : '');
 }
 
 async function deleteSticker(id, event) {
