@@ -651,11 +651,21 @@
       <div class="info-section">
         <h3>📊 Punkte-System</h3>
         <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
-          Jeder Sticker bringt Punkte. Boni für Hauptstädte, neue Länder und Fotos.
+          Punkte bekommst du fürs Sticker kleben — je weiter weg, desto mehr.
         </p>
 
         <div class="info-table">
-          <div class="info-table-head">📏 Distanz von Stahnsdorf</div>
+          <div class="info-table-head">🏷 Sticker kleben</div>
+          <div class="info-table-body">
+            <div class="info-table-label">Basis pro Sticker</div>       <div class="info-table-val accent">+10 Pkt</div>
+            <div class="info-table-label">🌍 Erstes Mal in neuem Land</div> <div class="info-table-val green">+10 Pkt</div>
+            <div class="info-table-label">🏛 Sticker in Hauptstadt</div>    <div class="info-table-val accent2">+3 Pkt</div>
+            <div class="info-table-label">📷 Foto beigefügt</div>           <div class="info-table-val accent2">+5 Pkt</div>
+          </div>
+        </div>
+
+        <div class="info-table">
+          <div class="info-table-head">📏 Distanz-Bonus von Stahnsdorf</div>
           <div class="info-table-body">
             <div class="info-table-label">Bis 1 km</div>         <div class="info-table-val">+0 Pkt</div>
             <div class="info-table-label">1 – 50 km</div>        <div class="info-table-val">+1 Pkt</div>
@@ -668,28 +678,16 @@
         </div>
 
         <div class="info-table">
-          <div class="info-table-head">✨ Boni (kumulativ)</div>
+          <div class="info-table-head">⭐ Sticker of the Month</div>
           <div class="info-table-body">
-            <div class="info-table-label">🏷 Sticker kleben</div>      <div class="info-table-val">+10 Pkt</div>
-            <div class="info-table-label">🌍 Neues Land</div>           <div class="info-table-val green">+10 Pkt</div>
-            <div class="info-table-label">🏛 Hauptstadt</div>           <div class="info-table-val accent2">+3 Pkt</div>
-            <div class="info-table-label">📷 Foto beigefügt</div>       <div class="info-table-val accent2">+5 Pkt</div>
-          </div>
-        </div>
-
-        <div class="info-table">
-          <div class="info-table-head">📅 Daily Login Bonus</div>
-          <div class="info-table-body">
-            <div class="info-table-label">Jeden Tag</div>     <div class="info-table-val">+1 Pkt</div>
-            <div class="info-table-label">7 Tage Serie</div>  <div class="info-table-val accent">+20 Pkt</div>
-            <div class="info-table-label">14 Tage Serie</div> <div class="info-table-val accent">+50 Pkt</div>
-            <div class="info-table-label">30 Tage Serie</div> <div class="info-table-val accent">+100 Pkt</div>
+            <div class="info-table-label">Monatlicher Gewinner</div>  <div class="info-table-val accent">+50 Pkt</div>
+            <div class="info-table-label">Community-Voting bis Monatsende</div> <div class="info-table-val">👑</div>
           </div>
         </div>
 
         <div class="info-tip">
-          🏆 <strong>Challenges</strong> bringen max. +10 Pkt · max. 1× täglich.<br>
-          🎮 <strong>Mini-Games</strong> max. 3× täglich spielbar.
+          🏆 Max. <strong>38 Punkte</strong> pro Sticker möglich — Basis + Distanz + alle Boni.<br>
+          ⭐ <strong>Sticker of the Month</strong>: Monatlich bester Sticker gewinnt 50 Punkte.
         </div>
       </div>
 
@@ -697,10 +695,11 @@
       <div class="info-section">
         <h3>🔒 Datenschutz</h3>
         <ul>
-          <li>Kein Account erforderlich</li>
-          <li>GPS auf ~1 km Radius verschleiert</li>
-          <li>EXIF-Metadaten aus Fotos entfernt</li>
-          <li>Keine persönlichen Daten gespeichert</li>
+          <li>Account empfohlen — für Sticker, Punkte &amp; Social-Features</li>
+          <li>GPS wird auf ~1 km Radius verschleiert</li>
+          <li>EXIF-Metadaten werden aus Fotos entfernt</li>
+          <li>Keine Klarnamen oder Standortdaten gespeichert</li>
+          <li>Nur Username &amp; Passwort-Hash in der Datenbank</li>
         </ul>
       </div>
 
@@ -708,10 +707,11 @@
       <div class="info-section">
         <h3>⚙️ Technik</h3>
         <ul>
-          <li>Karte: OpenStreetMap + Leaflet.js</li>
-          <li>Datenbank: Supabase (Frankfurt)</li>
+          <li>Karte: OpenStreetMap + Leaflet.js + MarkerCluster</li>
+          <li>Datenbank: Supabase (Frankfurt, EU)</li>
           <li>Hosting: Cloudflare Pages</li>
           <li>Domain: 32-er.com · Kosten: 0 €/Monat</li>
+          <li>Open Source: <a href="https://github.com/jacques-1337/sticker" style="color:var(--accent);text-decoration:none">GitHub</a></li>
         </ul>
       </div>
 

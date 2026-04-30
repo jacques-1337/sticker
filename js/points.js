@@ -22,15 +22,11 @@ const DIST_RULES = [
   { min:    0, pts:  0 },
 ];
 
-// ── Daily-Login-Milestones ─────────────────────
-const LOGIN_DAILY     =   1; // jeden Tag
-const LOGIN_STREAK_7  =  20; // nach 7 Tagen (einmalig)
-const LOGIN_STREAK_14 =  50;
-const LOGIN_STREAK_30 = 100;
-const LOGIN_STREAK_100= 500;
+// ── Sticker of the Month ──────────────────────
+const PTS_SOTM_WINNER = 50; // monatlicher Gewinner
 
 // ── Challenge-Limits ──────────────────────────
-const CHALLENGE_MAX_PTS_PER_DAY = 10; // max Gewinn pro Tag
+const CHALLENGE_MAX_PTS_PER_DAY  = 10; // max Gewinn pro Tag
 const CHALLENGE_MAX_WINS_PER_DAY =  1; // max 1 bezahlte Challenge/Tag
 
 // ── Game-Limits ───────────────────────────────
@@ -68,19 +64,6 @@ function calcPoints(city, hasPhoto, existingCodes) {
     capital,
     newCountry,
   };
-}
-
-// ── Login-Bonus berechnen ─────────────────────
-// streak: Anzahl aufeinanderfolgender Tage
-// Returns: { daily, milestone, total }
-function calcLoginBonus(streak) {
-  let milestone = 0;
-  if      (streak === 100) milestone = LOGIN_STREAK_100;
-  else if (streak === 30)  milestone = LOGIN_STREAK_30;
-  else if (streak === 14)  milestone = LOGIN_STREAK_14;
-  else if (streak === 7)   milestone = LOGIN_STREAK_7;
-
-  return { daily: LOGIN_DAILY, milestone, total: LOGIN_DAILY + milestone };
 }
 
 // ── Challenge-Punkte validieren ───────────────
