@@ -318,17 +318,17 @@ async function testFinishWin() {
   const res = await finishChallenge(activeChallenge.id, currentUser.id);
   if (res) {
     toast(`🏆 +${activeChallenge.points_stake} Pkt!`, 'success');
-    await loadChallenges(); renderChallenges(); closeGameOverlay();
+    closeGameOverlay();
+    await refreshAfterChallenge();
   }
 }
 async function testFinishLose() {
   if (!activeChallenge) return;
-  const loserId  = currentUser.id;
-  const winnerId = activeChallenge._other_id;
-  const res = await finishChallenge(activeChallenge.id, winnerId);
+  const res = await finishChallenge(activeChallenge.id, activeChallenge._other_id);
   if (res) {
     toast(`💔 -${activeChallenge.points_stake} Pkt`, 'error');
-    await loadChallenges(); renderChallenges(); closeGameOverlay();
+    closeGameOverlay();
+    await refreshAfterChallenge();
   }
 }
 async function testFinishTie() {
@@ -336,7 +336,21 @@ async function testFinishTie() {
   const res = await finishChallenge(activeChallenge.id, null);
   if (res) {
     toast('🤝 Unentschieden', 'info');
-    await loadChallenges(); renderChallenges(); closeGameOverlay();
+    closeGameOverlay();
+    await refreshAfterChallenge();
+  }
+}
+
+async function refreshAfterChallenge() {
+  await loadChallenges();
+  renderChallenges();
+  await refreshUserPoints();
+  updateMyScoreCard(null, null, 0);
+  loadDuelHistory();
+  // Freunde-Tab live aktualisieren wenn aktiv
+  if (typeof loadFriendsLeaderboard === 'function' &&
+      typeof currentScoreTab !== 'undefined' && currentScoreTab === 'friends') {
+    loadFriendsLeaderboard();
   }
 }
 
@@ -391,11 +405,10 @@ async function onChallengeChange(payload) {
     if (row.status === 'declined') toast('❌ Challenge abgelehnt', 'info');
     if (row.status === 'finished') {
       const won = row.winner_id === currentUser.id;
-      if (won)             toast(`🏆 +${row.points_stake} Pkt!`, 'success');
+      if (won)               toast(`🏆 +${row.points_stake} Pkt!`, 'success');
       else if (row.winner_id) toast(`💔 -${row.points_stake} Pkt`, 'error');
-      else                 toast('🤝 Unentschieden', 'info');
-      loadDuelHistory();
-      refreshUserPoints().then(() => updateMyScoreCard(null, null, 0));
+      else                   toast('🤝 Unentschieden', 'info');
+      refreshAfterChallenge();
     }
   }
 }

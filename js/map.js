@@ -100,45 +100,45 @@ function updateMapStats(visible) {
   document.getElementById('stat-countries').textContent = countries;
 }
 
-// ── User-Avatare für Marker laden ────────────────────────────
+// ── User-Avatare für Popups laden (nicht für Marker-Icons) ───
 async function loadUserAvatars() {
   if (!useSupabase || !stickers.length) return;
   const ownerIds = [...new Set(stickers.filter(s => s.owner_id).map(s => s.owner_id))];
   if (!ownerIds.length) return;
   try {
     const { data } = await db.from('users').select('id, avatar_url').in('id', ownerIds);
-    let changed = false;
     (data || []).forEach(u => {
-      if (u.avatar_url && userAvatarCache[u.id] !== u.avatar_url) {
-        userAvatarCache[u.id] = u.avatar_url;
-        changed = true;
-      }
+      if (u.avatar_url) userAvatarCache[u.id] = u.avatar_url;
     });
-    if (changed) renderMarkers();
-  } catch(e) { /* Avatare sind optional */ }
+    // Kein renderMarkers() hier — Avatare erscheinen nur in Popups, nicht auf Markern
+  } catch(e) { /* optional */ }
 }
 
 // ── Marker rendern ───────────────────────────────────────────
 function renderMarkers() {
   if (!map) return;
 
-  // Alten Layer entfernen und neuen passend zum Modus erstellen
-  if (markersLayer && map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+  // Alten Layer sauber entfernen
+  if (markersLayer) {
+    if (map.hasLayer(markersLayer)) map.removeLayer(markersLayer);
+    markersLayer = null;
+  }
 
   const useCluster = mapMode === 'cluster' && typeof L.markerClusterGroup === 'function';
 
   if (useCluster) {
     markersLayer = L.markerClusterGroup({
-      maxClusterRadius: 70,
-      spiderfyOnMaxZoom: true,
+      maxClusterRadius:    70,
+      spiderfyOnMaxZoom:   true,
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
-      animate: true,
+      animate:             true,
+      chunkedLoading:      true,
       iconCreateFunction(cluster) {
         const n    = cluster.getChildCount();
-        const size = n > 99 ? 54 : n > 9 ? 44 : 36;
+        const size = n > 99 ? 52 : n > 9 ? 44 : 36;
         return L.divIcon({
-          html:     `<div class="map-cluster" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.34)}px">${n}</div>`,
+          html:      `<div class="map-cluster" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.34)}px">${n}</div>`,
           className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
         });
       }
@@ -155,67 +155,56 @@ function renderMarkers() {
     const lng = s.lng || s.city_lng;
     if (!lat || !lng) return;
 
-    const pts = s.points || s.pts || 0;
+    const pts      = s.points || s.pts || 0;
     const isOwn    = currentUser && s.owner_id === currentUser.id;
     const isFriend = currentUser && !isOwn && friendsCache.some(f => f.id === s.owner_id);
+    const extraClass = isOwn ? ' map-marker-own' : isFriend ? ' map-marker-friend' : '';
 
-    let extraClass = isOwn ? ' map-marker-own' : isFriend ? ' map-marker-friend' : '';
+    // Marker zeigt immer Punktzahl — kein Avatar auf dem Marker
+    const size         = pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22;
+    const capitalBadge = s.is_capital ? '<span class="map-marker-capital">★</span>' : '';
 
-    let icon;
-    if (useCluster) {
-      // Cluster-Modus: einfache farbige Kreise mit Punktzahl
-      const size = pts >= 20 ? 34 : pts >= 10 ? 28 : 24;
-      const capitalBadge = s.is_capital ? '<span class="map-marker-capital">★</span>' : '';
-      icon = L.divIcon({
-        className: '',
-        html: `<div class="map-marker${extraClass}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${pts}${capitalBadge}</div>`,
-        iconSize: [size, size], iconAnchor: [size/2, size/2]
-      });
-    } else {
-      // Profil-Modus: Avatar wenn vorhanden
-      const avatarUrl = s.owner_id ? userAvatarCache[s.owner_id] : null;
-      const size = avatarUrl ? 38 : (pts >= 20 ? 36 : pts >= 10 ? 30 : pts >= 5 ? 26 : 22);
-      const capitalBadge = s.is_capital && !avatarUrl ? '<span class="map-marker-capital">★</span>' : '';
-      const inner = avatarUrl
-        ? `<img src="${avatarUrl}" class="map-marker-img" onerror="this.style.display='none';this.nextSibling.style.display='flex'"><span class="map-marker-fallback" style="display:none">${pts}</span>`
-        : `${pts}${capitalBadge}`;
-      icon = L.divIcon({
-        className: '',
-        html: `<div class="map-marker${extraClass}${avatarUrl?' map-marker-has-avatar':''}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${inner}</div>`,
-        iconSize: [size, size], iconAnchor: [size/2, size/2]
-      });
-    }
+    const icon = L.divIcon({
+      className: '',
+      html:      `<div class="map-marker${extraClass}" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.38)}px">${pts}${capitalBadge}</div>`,
+      iconSize:  [size, size], iconAnchor: [size/2, size/2]
+    });
 
-    // Popup-Inhalt (beide Modi)
-    let ownerLabel = '';
+    // Popup: Avatar hier anzeigen (nicht auf dem Marker)
+    const avUrl  = s.owner_id ? userAvatarCache[s.owner_id] : null;
+    const avImg  = avUrl
+      ? `<img src="${avUrl}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle" onerror="this.style.display='none'">`
+      : '';
+
+    let ownerLine = '';
     if (isOwn) {
-      const avUrl = userAvatarCache[s.owner_id];
-      const avHtml = avUrl
-        ? `<img src="${avUrl}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px">`
-        : '';
-      ownerLabel = `<div style="font-size:11px;color:#e8c84a;font-weight:700;margin-top:2px">${avHtml}👤 von dir</div>`;
+      ownerLine = `<div style="display:flex;align-items:center;gap:6px;margin-top:5px">${avImg}<span style="font-size:11px;color:#e8c84a;font-weight:700">👤 von dir</span></div>`;
     } else if (s.owner_id) {
-      const friend  = friendsCache.find(f => f.id === s.owner_id);
-      const avUrl   = userAvatarCache[s.owner_id];
-      const avHtml  = avUrl ? `<img src="${avUrl}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:4px">` : '';
-      if (friend)          ownerLabel = `<div style="font-size:11px;color:#8aa9e8;font-weight:700;margin-top:2px">${avHtml}👥 ${escHtml(friend.username)}</div>`;
-      else if (s.username) ownerLabel = `<div style="font-size:11px;color:#8888aa;margin-top:2px">${avHtml}von ${escHtml(s.username)}</div>`;
+      const friend = friendsCache.find(f => f.id === s.owner_id);
+      const name   = friend?.username || s.username;
+      if (name) {
+        const color  = friend ? '#8aa9e8' : '#8888aa';
+        const weight = friend ? '700'     : '400';
+        const prefix = friend ? '👥 '     : '';
+        ownerLine = `<div style="display:flex;align-items:center;gap:6px;margin-top:5px">${avImg}<span style="font-size:11px;color:${color};font-weight:${weight}">${prefix}${escHtml(name)}</span></div>`;
+      }
     } else if (s.username) {
-      ownerLabel = `<div style="font-size:11px;color:#8888aa;margin-top:2px">von ${escHtml(s.username)}</div>`;
+      ownerLine = `<div style="font-size:11px;color:#8888aa;margin-top:5px">von ${escHtml(s.username)}</div>`;
     }
 
-    const capitalNote = s.is_capital ? `<div style="font-size:11px;color:#e8c84a;margin-top:2px">🏛 Hauptstadt +3 Pkt</div>` : '';
+    const capitalLine = s.is_capital
+      ? `<div style="font-size:11px;color:#e8c84a;margin-top:2px">🏛 Hauptstadt</div>` : '';
 
     const marker = L.marker([lat, lng], { icon });
     marker.bindPopup(`
-      <div style="min-width:160px">
-        <div style="font-size:24px;margin-bottom:4px">${s.flag||'📍'}</div>
-        <div style="font-weight:700;font-size:15px;color:#f0f0f8">${escHtml(s.city||'')}</div>
-        <div style="font-size:12px;color:#8888aa;margin-bottom:6px">${escHtml(s.country||'')}</div>
+      <div style="min-width:160px;max-width:220px">
+        <div style="font-size:24px;margin-bottom:4px">${s.flag || '📍'}</div>
+        <div style="font-weight:700;font-size:15px;color:#f0f0f8">${escHtml(s.city || '')}</div>
+        <div style="font-size:12px;color:#8888aa;margin-bottom:6px">${escHtml(s.country || '')}</div>
         ${s.photo_url ? `<img src="${s.photo_url}" style="width:100%;border-radius:8px;margin-bottom:8px;aspect-ratio:1/1;max-height:160px;object-fit:contain;object-position:center;background:#0a0a0a" onerror="this.style.display='none'">` : ''}
         <div style="font-size:20px;font-weight:800;color:#e8c84a">${pts} Punkte</div>
-        ${capitalNote}${ownerLabel}
-        ${s.note ? `<div style="font-size:12px;color:#8888aa;margin-top:4px">${escHtml(s.note)}</div>` : ''}
+        ${capitalLine}${ownerLine}
+        ${s.note ? `<div style="font-size:12px;color:#8888aa;margin-top:6px;padding-top:6px;border-top:1px solid #2a2a3d">${escHtml(s.note)}</div>` : ''}
       </div>
     `);
     markersLayer.addLayer(marker);

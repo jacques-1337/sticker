@@ -7,37 +7,8 @@ let stickers = [];
 let selectedLocation = null;
 let photoData = null;
 
-// ── Punkte-Berechnung ────────────────────────────────────────
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2-lat1)*Math.PI/180;
-  const dLng = (lng2-lng1)*Math.PI/180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function getDistancePoints(km) {
-  if (km >= 10000) return 25;
-  if (km >= 5000)  return 10;
-  if (km >= 2000)  return 5;
-  return 1;
-}
-
-function calcPoints(city, hasPhoto, existingCountries) {
-  const km  = haversine(HOME_LAT, HOME_LNG, city.lat, city.lng);
-  let pts   = getDistancePoints(km);
-  if (hasPhoto) pts += 5;
-  if (city.cap) pts += 3;
-  if (!existingCountries.includes(city.cc)) pts += 10;
-  return {
-    total:      pts,
-    km:         Math.round(km),
-    dist:       getDistancePoints(km),
-    photo:      hasPhoto ? 5 : 0,
-    capital:    city.cap ? 3 : 0,
-    newCountry: !existingCountries.includes(city.cc) ? 10 : 0
-  };
-}
+// ── Punkte-Berechnung via points.js ──────────────────────────
+// calcPoints(), getDistancePoints(), haversine() kommen aus points.js
 
 function getContinent(city) {
   const map = { EU:'Europa', NA:'Nordamerika', SA:'Südamerika', AS:'Asien', AF:'Afrika', OC:'Ozeanien' };
