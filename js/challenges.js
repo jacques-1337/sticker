@@ -216,6 +216,26 @@ async function cancelChallenge(challengeId) {
 }
 
 async function finishChallenge(challengeId, winnerId) {
+  // Wenn Challenges aktiv: Tageslimit prüfen (max 1 Gewinn/Tag)
+  if (FEATURE_FLAGS.challenges_active && winnerId === currentUser?.id && useSupabase) {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const { data: todayWins } = await db.from('challenges')
+        .select('id').eq('winner_id', currentUser.id)
+        .eq('status', 'finished')
+        .gte('completed_at', today + 'T00:00:00Z');
+      if ((todayWins || []).length >= CHALLENGE_MAX_WINS_PER_DAY) {
+        toast('Tageslimit erreicht — max. 1 Challenge-Belohnung/Tag', 'error');
+        // Challenge trotzdem beenden, aber kein Punkte-Transfer
+        await db.from('challenges').update({
+          status: 'finished', winner_id: winnerId,
+          completed_at: new Date().toISOString(), updated_at: new Date().toISOString()
+        }).eq('id', challengeId);
+        return { success: true, winner_id: winnerId, stake: 0, limitReached: true };
+      }
+    } catch(e) { /* Limit-Check fehlgeschlagen → normal fortfahren */ }
+  }
+
   try {
     const { data, error } = await db.rpc('finish_challenge', {
       p_challenge_id: challengeId,
@@ -287,25 +307,75 @@ function openGameOverlay(challengeId) {
   $id('ch-vs-opp').textContent      = c._other_username;
   $id('ch-vs-stake').textContent    = c.points_stake;
 
+  $id('ch-game-overlay').classList.add('open');
+
   if (c.game_type === 'connect4') {
-    $id('ch-game-overlay').classList.add('open');
     renderConnect4(c);
+  } else if (c.game_type === 'racing') {
+    _startRacingChallenge(c);
   } else {
     $id('ch-game-stage').innerHTML = `<div style="text-align:center;color:var(--text2);padding:40px 16px">
-      🎮 ${g.name} kommt im nächsten Update.<br>
-      <span style="font-size:11px">Du kannst die Challenge bereits akzeptieren — das Spiel selbst folgt.</span>
+      🎮 ${escHtml(g.name)} kommt im nächsten Update.
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="ch-btn" onclick="testFinishWin()">Testweise gewinnen</button>
         <button class="ch-btn ghost" onclick="testFinishTie()">Unentschieden</button>
         <button class="ch-btn danger" onclick="testFinishLose()">Testweise verlieren</button>
       </div>
     </div>`;
-    $id('ch-game-overlay').classList.add('open');
   }
+}
+
+function _startRacingChallenge(c) {
+  const stage = $id('ch-game-stage');
+  if (!stage) return;
+
+  // Beide Spieler spielen nacheinander — Challenger zuerst
+  const myTurn = c._i_am_challenger
+    ? !c.game_state?.challenger_done
+    : !c.game_state?.opponent_done;
+
+  if (!myTurn) {
+    const myScore  = c._i_am_challenger ? c.game_state?.challenger_score : c.game_state?.opponent_score;
+    const oppScore = c._i_am_challenger ? c.game_state?.opponent_score    : c.game_state?.challenger_score;
+    stage.innerHTML = `<div style="text-align:center;color:var(--text2);padding:24px 16px">
+      🏎 Dein Score: <strong style="color:var(--accent)">${myScore ?? '–'} Pkt</strong><br>
+      Warte auf ${escHtml(c._other_username)}…
+    </div>`;
+    return;
+  }
+
+  if (typeof RacingGame === 'undefined') {
+    stage.innerHTML = `<div class="muted-empty">Racing-Modul nicht geladen.</div>`;
+    return;
+  }
+
+  RacingGame.start(stage, async (score) => {
+    const myKey    = c._i_am_challenger ? 'challenger' : 'opponent';
+    const oppKey   = c._i_am_challenger ? 'opponent'   : 'challenger';
+    const newState = { ...(c.game_state || {}) };
+    newState[myKey + '_score'] = score;
+    newState[myKey + '_done']  = true;
+
+    await db.from('challenges').update({ game_state: newState, updated_at: new Date().toISOString() }).eq('id', c.id);
+
+    const oppScore = newState[oppKey + '_score'];
+    if (newState[oppKey + '_done'] && oppScore !== undefined) {
+      // Beide fertig → Gewinner ermitteln
+      const myWin = score > oppScore;
+      const tie   = score === oppScore;
+      const winId = tie ? null : (myWin ? currentUser.id : c._other_id);
+      await finishChallenge(c.id, winId);
+    } else {
+      toast(`🏎 Dein Score: ${score} Pkt — warte auf ${escHtml(c._other_username)}`, 'success');
+      closeGameOverlay();
+      await loadChallenges(); renderChallenges();
+    }
+  });
 }
 
 function closeGameOverlay() {
   $id('ch-game-overlay').classList.remove('open');
+  if (typeof RacingGame !== 'undefined') RacingGame.stop();
   activeChallenge = null;
 }
 

@@ -7,14 +7,11 @@
 // ── Game-Definitionen ────────────────────────────────────────
 // live: true → Spiel spielbar, false → Coming Soon
 const MGC_GAMES = [
+  { key: 'racing',     icon: '🏎', name: 'Racing',      unit: 'Runden',  live: true,  prize: 30 },
+  { key: 'connect4',   icon: '🔴', name: '4 gewinnt',   unit: 'Siege',   live: false, prize: 20 },
   { key: 'flappy',     icon: '🐤', name: 'Flappy Bird', unit: 'Meter',   live: false, prize: 20 },
   { key: 'tetris',     icon: '🧱', name: 'Tetris',      unit: 'Punkte',  live: false, prize: 20 },
   { key: 'snake',      icon: '🐍', name: 'Snake',       unit: 'Länge',   live: false, prize: 20 },
-  { key: 'dino',       icon: '🦕', name: 'Dino Run',    unit: 'Meter',   live: false, prize: 15 },
-  { key: 'pong',       icon: '🏓', name: 'Pong',        unit: 'Punkte',  live: false, prize: 15 },
-  { key: 'memory',     icon: '🃏', name: 'Memory',      unit: 'Sek.',    live: false, prize: 10, lowerIsBetter: true },
-  { key: 'minesweeper',icon: '💣', name: 'Minesweeper', unit: 'Sek.',    live: false, prize: 10, lowerIsBetter: true },
-  { key: '2048',       icon: '🔢', name: '2048',        unit: 'Punkte',  live: false, prize: 20 },
 ];
 
 // ── Beispiel-Highscores (werden später aus DB geladen) ───────
@@ -213,36 +210,100 @@ function mgcRow(entry, rank, unit, lowerIsBetter = false) {
   </div>`;
 }
 
-// ── Spiel starten (Placeholder) ──────────────────────────────
-function launchMgcGame(key) {
+// ── Tägliche Spielversuche prüfen ────────────────────────────
+async function checkDailyAttempts(gameKey) {
+  if (!currentUser || !useSupabase) return { allowed: true, count: 0, max: GAME_MAX_PLAYS_PER_DAY };
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const { data } = await db.from('minigame_attempts')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .eq('game_key', gameKey)
+      .gte('played_at', today + 'T00:00:00Z');
+    const count = (data || []).length;
+    return { allowed: count < GAME_MAX_PLAYS_PER_DAY, count, max: GAME_MAX_PLAYS_PER_DAY };
+  } catch(e) { return { allowed: true, count: 0, max: GAME_MAX_PLAYS_PER_DAY }; }
+}
+
+async function trackAttempt(gameKey) {
+  if (!currentUser || !useSupabase) return;
+  try {
+    await db.from('minigame_attempts').insert({ user_id: currentUser.id, game_key: gameKey });
+  } catch(e) { /* ignorieren */ }
+}
+
+// ── Spiel starten ─────────────────────────────────────────────
+async function launchMgcGame(key) {
   const game = MGC_GAMES.find(g => g.key === key);
   if (!game) return;
-  if (!currentUser) {
-    toast('🔒 Bitte einloggen um zu spielen', 'error');
-    return;
+  if (!currentUser) { toast('🔒 Bitte einloggen', 'error'); return; }
+  if (!game.live)   { toast(`🔒 ${game.name} kommt bald!`); return; }
+
+  // Limit prüfen wenn Feature aktiv
+  if (FEATURE_FLAGS.games_active) {
+    const { allowed, count, max } = await checkDailyAttempts(key);
+    if (!allowed) {
+      toast(`Heute schon ${max}× gespielt — morgen wieder!`, 'error');
+      return;
+    }
+    if (count > 0) toast(`Versuch ${count + 1} von ${max}`, '');
   }
-  if (!game.live) {
-    toast(`🔒 ${game.name} kommt bald!`, '');
-    return;
+
+  if (key === 'racing') {
+    _openSoloRacingOverlay();
+  } else {
+    toast(`▶ ${game.name} startet…`, 'success');
   }
-  // Echte Spiele werden hier geöffnet (eigenes Overlay)
-  toast(`▶ ${game.name} startet…`, 'success');
+}
+
+function _openSoloRacingOverlay() {
+  if (typeof RacingGame === 'undefined') { toast('Racing-Modul fehlt', 'error'); return; }
+
+  // Game-Overlay im Solo-Modus öffnen (ohne VS-Header)
+  const overlay = document.getElementById('ch-game-overlay');
+  const stage   = document.getElementById('ch-game-stage');
+  const title   = document.getElementById('ch-game-title');
+  const vsRow   = document.querySelector('.ch-vs');
+  if (!overlay || !stage) return;
+
+  if (title)  title.textContent = '🏎 Racing — Monatlicher Highscore';
+  if (vsRow)  vsRow.style.display = 'none';
+  overlay.classList.add('open');
+
+  RacingGame.start(stage, async (score) => {
+    if (vsRow) vsRow.style.display = '';
+    overlay.classList.remove('open');
+    await trackAttempt('racing');
+    await submitMgcScore('racing', score);
+  });
 }
 
 // ── Score eintragen (Placeholder — wird nach Spielimplementierung genutzt) ───
 async function submitMgcScore(gameKey, score) {
   if (!currentUser || !useSupabase) return;
   try {
-    const month = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-    const { error } = await db.from('minigame_scores').upsert({
-      user_id:  currentUser.id,
-      game_key: gameKey,
-      score,
-      month,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id,game_key,month' });
+    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const game  = MGC_GAMES.find(g => g.key === gameKey);
+
+    // Nur speichern wenn kein bestehender Score oder neuer ist besser
+    const { data: existing } = await db.from('minigame_scores')
+      .select('score').eq('user_id', currentUser.id)
+      .eq('game_key', gameKey).eq('month', month).maybeSingle();
+
+    const isBetter = !existing ||
+      (game?.lowerIsBetter ? score < existing.score : score > existing.score);
+
+    if (!isBetter) {
+      toast(`Score: ${score} Pkt (Bestleistung: ${existing.score})`, '');
+      return;
+    }
+
+    const { error } = await db.from('minigame_scores').upsert(
+      { user_id: currentUser.id, game_key: gameKey, score, month },
+      { onConflict: 'user_id,game_key,month' }
+    );
     if (error) throw error;
-    toast('🏆 Score gespeichert!', 'success');
+    toast(`🏆 Neuer Highscore: ${score} Pkt!`, 'success');
     await loadMgcScores(gameKey);
     renderMgcBoard(gameKey);
   } catch(e) {

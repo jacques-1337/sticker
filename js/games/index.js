@@ -8,37 +8,36 @@ const GAMES = {
     key:      'connect4',
     name:     '4 gewinnt',
     icon:     '🔴',
-    kind:     'turn',   // 'turn' = abwechselnd, 'solo' = jeder für sich
-    minStake: 0,
-    maxStake: 9999,
-    enabled:  true
+    kind:     'turn',   // 'turn' = abwechselnd, 'solo' = jeder spielt selbst
+    minStake: 0, maxStake: 9999, enabled: true
+  },
+  racing: {
+    key:      'racing',
+    name:     'Racing',
+    icon:     '🏎',
+    kind:     'solo',   // Solo-Score, beide spielen nacheinander
+    minStake: 0, maxStake: 9999, enabled: true
   },
   battleship: {
     key:      'battleship',
     name:     'Schiffe versenken',
     icon:     '🚢',
     kind:     'turn',
-    minStake: 0,
-    maxStake: 9999,
-    enabled:  true
+    minStake: 0, maxStake: 9999, enabled: false // noch nicht fertig
   },
   flappy: {
     key:      'flappy',
     name:     'Flappy Bird',
     icon:     '🐤',
     kind:     'solo',
-    minStake: 0,
-    maxStake: 9999,
-    enabled:  true
+    minStake: 0, maxStake: 9999, enabled: false
   },
   tetris: {
     key:      'tetris',
     name:     'Tetris',
     icon:     '🧱',
     kind:     'solo',
-    minStake: 0,
-    maxStake: 9999,
-    enabled:  true
+    minStake: 0, maxStake: 9999, enabled: false
   }
 };
 

@@ -1726,7 +1726,57 @@ body {
 .pin-request-item .pr-pin  { color: var(--green); font-family: monospace; font-size: var(--f-md); }
 
 
-/* ── 25. CONNECT 4 ───────────────────────────────────────── */
+/* ── 25. RACING GAME ────────────────────────────────────────── */
+.rg-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: 100%; max-width: 340px; margin: 0 auto;
+}
+.rg-hud {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 8px 16px;
+}
+.rg-stat   { text-align: center; }
+.rg-center { flex: 1; }
+.rg-val    { font-size: 24px; font-weight: 900; color: var(--accent); line-height: 1; }
+.rg-lbl    { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+.rg-timer  { font-size: 28px; transition: color var(--t-base); }
+
+.rg-btns {
+  display: flex; gap: 10px; align-items: center;
+  width: 100%; justify-content: center;
+}
+.rg-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-md); color: var(--text);
+  width: 72px; height: 56px;
+  font-size: 22px; font-family: inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2px;
+  transition: background var(--t-fast), transform var(--t-fast);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.rg-btn:active  { background: var(--surface3); transform: scale(0.93); }
+.rg-gas-btn     { background: var(--accent); color: var(--bg); border-color: var(--accent); width: 80px; height: 64px; font-size: 20px; }
+.rg-gas-btn:active { background: var(--accent2); }
+.rg-btn small   { font-size: 10px; line-height: 1; }
+
+.rg-msg { width: 100%; }
+.rg-result {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.rg-result-laps  { font-size: 22px; font-weight: 800; color: var(--text); }
+.rg-result-score { font-size: 18px; font-weight: 700; color: var(--accent); }
+.rg-play-again {
+  margin-top: 8px; background: var(--accent); color: var(--bg);
+  border: none; border-radius: var(--r-sm); padding: 10px 24px;
+  font-size: var(--f-base); font-weight: 700; font-family: inherit; cursor: pointer;
+}
+
+/* ── 25b. CONNECT 4 ─────────────────────────────────────────── */
 .c4-wrap { width:100%; max-width:320px; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .c4-status { font-size:var(--f-base); font-weight:700; color:var(--text); text-align:center; min-height:20px; }
 .c4-legend { font-size:11px; color:var(--text2); text-align:center; }
